@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Safety Checker - AI-Powered Website Security Analyzer</title>
+  <meta name="description" content="Determine whether a website is safe or malicious using real-time heuristic security analysis and threat intelligence. Protect yourself against phishing, malware, and rogue domains.">
+  
+  <!-- Google Fonts: Inter & Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Header / Navigation Bar -->
+  <header class="navbar-header" id="navbar">
+    <div class="container nav-container">
+      <a href="#home" class="brand-logo">
+        <div class="logo-icon-wrapper">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <span class="brand-name">Shield<span class="highlight">URL</span></span>
+        <span class="badge-pro">SaaS AI</span>
+      </a>
+
+      <nav class="nav-menu" id="nav-menu">
+        <a href="#home" class="nav-link active"><i class="fa-solid fa-house nav-icon"></i> Home</a>
+        <a href="#scanner" class="nav-link"><i class="fa-solid fa-radar nav-icon"></i> Scanner</a>
+        <a href="#dashboard" class="nav-link" id="nav-dashboard-link"><i class="fa-solid fa-chart-line nav-icon"></i> Dashboard</a>
+        <a href="#features" class="nav-link"><i class="fa-solid fa-cubes nav-icon"></i> Features</a>
+        <a href="#how-it-works" class="nav-link"><i class="fa-solid fa-diagram-project nav-icon"></i> How It Works</a>
+        <a href="#history" class="nav-link"><i class="fa-solid fa-clock-rotate-left nav-icon"></i> History</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div id="db-status-badge" class="db-status-indicator" title="Connected to Supabase PostgreSQL Database">
+          <i class="fa-solid fa-database"></i> <span id="db-status-text">Supabase DB</span>
+        </div>
+
+        <button id="btn-api-modal" class="btn-secondary btn-sm" title="Configure Threat API Keys">
+          <i class="fa-solid fa-key"></i> API Keys
+        </button>
+
+        <!-- Dynamic Authentication & User Profile Component -->
+        <div id="auth-nav-container">
+          <button id="btn-open-auth" class="btn-secondary btn-sm">
+            <i class="fa-solid fa-user"></i> Sign In / Register
+          </button>
+          
+          <div id="user-profile-menu" class="user-profile-dropdown" style="display: none;">
+            <button id="btn-user-dropdown" class="user-profile-btn">
+              <div class="user-avatar" id="user-avatar-initials">AS</div>
+              <span class="user-display-name" id="user-display-name">Alex Security</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div id="user-dropdown-content" class="dropdown-content glass-card" style="display: none;">
+              <div class="dropdown-header">
+                <strong id="dropdown-user-name">Alex Security</strong>
+                <small id="dropdown-user-email">analyst@shieldurl.io</small>
+              </div>
+              <hr class="dropdown-divider">
+              <a href="#dashboard" class="dropdown-item"><i class="fa-solid fa-gauge"></i> Executive Dashboard</a>
+              <a href="#history" class="dropdown-item"><i class="fa-solid fa-clock-rotate-left"></i> My Scan Vault</a>
+              <a href="#scanner" class="dropdown-item"><i class="fa-solid fa-plus"></i> New Security Audit</a>
+              <hr class="dropdown-divider">
+              <button id="btn-logout" class="dropdown-item text-danger"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+            </div>
+          </div>
+        </div>
+
+        <a href="#scanner" class="btn-primary btn-sm">
+          <i class="fa-solid fa-bolt"></i> Quick Scan
+        </a>
+        
+        <button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle navigation menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Wrapper -->
+  <main>
+    
+    <!-- Hero Section -->
+    <section id="home" class="hero-section">
+      <div class="container hero-container">
+        <div class="hero-content">
+          <div class="hero-badge">
+            <span class="pulse-dot"></span> Next-Gen Threat Intelligence
+          </div>
+          <h1 class="hero-title">
+            AI-Powered <span class="gradient-text">Website Security</span> & URL Safety Analyzer
+          </h1>
+          <p class="hero-description">
+            Protect your digital identity against phishing attacks, ransomware, malware URLs, and dangerous domains. Real-time heuristic AI analysis combined with threat intelligence APIs.
+          </p>
+
+          <!-- Preset Demo Buttons -->
+          <div class="preset-urls">
+            <span class="preset-label"><i class="fa-solid fa-vial"></i> Try Sample URLs:</span>
+            <button class="preset-btn safe" data-url="https://google.com">
+              <i class="fa-solid fa-circle-check"></i> Safe Site
+            </button>
+            <button class="preset-btn warning" data-url="http://free-crypto-airdrop-claim-now.xyz/login.php?id=9821">
+              <i class="fa-solid fa-triangle-exclamation"></i> Suspicious
+            </button>
+            <button class="preset-btn danger" data-url="http://192.168.1.100/paypal-verify-account-update.exe">
+              <i class="fa-solid fa-skull-crossbones"></i> Malicious
+            </button>
+          </div>
+
+          <!-- Quick Stat Highlights -->
+          <div class="hero-stats">
+            <div class="stat-item">
+              <span class="stat-number" data-target="99.8">99.8%</span>
+              <span class="stat-label">Detection Rate</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number" data-target="1.4">1.4s</span>
+              <span class="stat-label">Avg Scan Speed</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number" data-target="150">150+</span>
+              <span class="stat-label">Heuristic Rules</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-image-wrapper">
+          <img src="assets/images/hero.svg" alt="Cybersecurity Shield Illustration" class="hero-illustration">
+        </div>
+      </div>
+    </section>
+
+    <!-- Executive User Dashboard Section -->
+    <section id="dashboard" class="dashboard-analytics-section">
+      <div class="container">
+        <div class="section-header text-center">
+          <span class="section-subtitle">Executive Command Center</span>
+          <h2 class="section-title">Cybersecurity Operations Dashboard</h2>
+          <p class="section-description">
+            Real-time analytics, user threat telemetry, custom URL Whitelist/Blacklist rules, and security preferences.
+          </p>
+        </div>
+
+        <!-- Metric KPI Cards Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon blue"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+            <div class="kpi-info">
+              <span class="kpi-value" id="kpi-total-scans">0</span>
+              <span class="kpi-label">Total Audits Performed</span>
+            </div>
+          </div>
+
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon red"><i class="fa-solid fa-shield-virus"></i></div>
+            <div class="kpi-info">
+              <span class="kpi-value" id="kpi-blocked-threats">0</span>
+              <span class="kpi-label">Blocked Malicious URLs</span>
+            </div>
+          </div>
+
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon green"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="kpi-info">
+              <span class="kpi-value" id="kpi-safe-ratio">100%</span>
+              <span class="kpi-label">Safe Domain Ratio</span>
+            </div>
+          </div>
+
+          <div class="kpi-card glass-card">
+            <div class="kpi-icon purple"><i class="fa-solid fa-server"></i></div>
+            <div class="kpi-info">
+              <span class="kpi-value" id="kpi-api-quota">9,850 / 10K</span>
+              <span class="kpi-label">Monthly Threat API Quota</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Dashboard Split Layout -->
+        <div class="dash-main-grid">
+          
+          <!-- Threat Distribution Breakdown -->
+          <div class="dash-card glass-card">
+            <h3 class="card-title"><i class="fa-solid fa-chart-pie icon-blue"></i> Security Risk Distribution</h3>
+            <div class="risk-distribution-container">
+              <div class="dist-bar-wrapper">
+                <div class="dist-bar">
+                  <div class="dist-segment safe" id="dist-safe-bar" style="width: 70%;" title="Safe URLs"></div>
+                  <div class="dist-segment warning" id="dist-warn-bar" style="width: 20%;" title="Suspicious"></div>
+                  <div class="dist-segment danger" id="dist-danger-bar" style="width: 10%;" title="Malicious"></div>
+                </div>
+              </div>
+
+              <div class="dist-legend-grid">
+                <div class="dist-legend-item">
+                  <span class="legend-dot safe"></span>
+                  <div class="dist-item-details">
+                    <span class="dist-item-title">Safe Domains</span>
+                    <span class="dist-item-count" id="dist-safe-count">0 (0%)</span>
+                  </div>
+                </div>
+                <div class="dist-legend-item">
+                  <span class="legend-dot warning"></span>
+                  <div class="dist-item-details">
+                    <span class="dist-item-title">Suspicious Links</span>
+                    <span class="dist-item-count" id="dist-warn-count">0 (0%)</span>
+                  </div>
+                </div>
+                <div class="dist-legend-item">
+                  <span class="legend-dot danger"></span>
+                  <div class="dist-item-details">
+                    <span class="dist-item-title">Malicious / Phishing</span>
+                    <span class="dist-item-count" id="dist-danger-count">0 (0%)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Threat Alert Ticker -->
+            <div class="threat-ticker-box">
+              <h4><i class="fa-solid fa-triangle-exclamation icon-blue"></i> Live Threat Telemetry Feed</h4>
+              <ul class="threat-feed-list" id="threat-feed-list">
+                <li><span class="feed-time">Just Now</span> <span class="feed-tag danger">BLOCKED</span> Phishing domain <code>paypal-verify-account.xyz</code></li>
+                <li><span class="feed-time">2m ago</span> <span class="feed-tag warning">WARN</span> High entropy URL <code>a9f8z1.crypto-bonus.top</code></li>
+                <li><span class="feed-time">15m ago</span> <span class="feed-tag safe">PASSED</span> Verified SSL audit for <code>google.com</code></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Custom Domain Rules: Whitelist / Blacklist Manager -->
+          <div class="dash-card glass-card">
+            <div class="dash-header-actions">
+              <h3 class="card-title"><i class="fa-solid fa-list-check icon-blue"></i> Custom Domain Rules Manager</h3>
+            </div>
+
+            <!-- Add Domain Rule Form -->
+            <form id="rule-form" class="rule-input-form" onsubmit="return false;">
+              <input type="text" id="rule-domain-input" placeholder="e.g. trusted-partner.org" required>
+              <select id="rule-type-select" class="custom-select">
+                <option value="whitelist">🟢 Whitelist (Always Safe)</option>
+                <option value="blacklist">🔴 Blacklist (Always Block)</option>
+              </select>
+              <button type="submit" id="btn-add-rule" class="btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Add Rule
+              </button>
+            </form>
+
+            <div class="table-responsive rules-table-container">
+              <table class="rules-table">
+                <thead>
+                  <tr>
+                    <th>Domain</th>
+                    <th>Rule Type</th>
+                    <th class="text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="rules-tbody">
+                  <!-- Dynamically populated by script.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Security Preferences Controls -->
+            <div class="preferences-box">
+              <h4><i class="fa-solid fa-sliders icon-blue"></i> Analyst Security Preferences</h4>
+              <div class="pref-toggle-list">
+                <label class="pref-toggle-item">
+                  <span>Auto-block High Entropy DGA Domains</span>
+                  <input type="checkbox" id="pref-dga-block" checked>
+                </label>
+                <label class="pref-toggle-item">
+                  <span>Send Immediate Email Alerts for Malicious Scans</span>
+                  <input type="checkbox" id="pref-email-alerts" checked>
+                </label>
+                <label class="pref-toggle-item">
+                  <span>Strict SSL & Certificate Revocation Enforcement</span>
+                  <input type="checkbox" id="pref-strict-ssl">
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- URL Scanner Section -->
+    <section id="scanner" class="scanner-section">
+      <div class="container">
+        
+        <!-- Scanner Input Card -->
+        <div class="scanner-card glass-card">
+          <div class="scanner-card-header">
+            <h2><i class="fa-solid fa-magnifying-glass-shield icon-blue"></i> Analyze Website URL</h2>
+            <p>Enter any domain name or complete URL (HTTP/HTTPS) to launch immediate heuristic scan.</p>
+          </div>
+
+          <form id="url-scan-form" class="url-input-form" onsubmit="return false;">
+            <div class="input-group">
+              <div class="input-prefix">
+                <i class="fa-solid fa-globe"></i>
+              </div>
+              <input 
+                type="url" 
+                id="url-input" 
+                class="url-input" 
+                placeholder="e.g. https://paypal.verification-portal-security.xyz/login" 
+                required
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button type="button" id="btn-clear-url" class="btn-clear" title="Clear Input" style="display: none;">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <button type="submit" id="btn-analyze" class="btn-primary btn-analyze">
+              <span class="btn-text"><i class="fa-solid fa-shield-halved"></i> Analyze Security</span>
+              <span class="btn-spinner" style="display: none;"><i class="fa-solid fa-circle-notch fa-spin"></i> Scanning...</span>
+            </button>
+          </form>
+
+          <div class="input-tips">
+            <span><i class="fa-solid fa-circle-info"></i> Tip: Supports IP addresses, subdomains, and deep link paths.</span>
+          </div>
+        </div>
+
+        <!-- Animated Scanning Progress Container (Hidden by default) -->
+        <div id="scanning-loader" class="scanning-loader-container glass-card" style="display: none;">
+          <div class="loader-header">
+            <h3><i class="fa-solid fa-atom fa-spin icon-blue"></i> Performing Deep Security Analysis...</h3>
+            <span id="scan-progress-percentage" class="progress-percentage">0%</span>
+          </div>
+          
+          <div class="progress-bar-wrapper">
+            <div id="scan-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+
+          <div class="scan-steps-grid">
+            <div class="scan-step-item" id="step-1">
+              <div class="step-icon"><i class="fa-solid fa-lock"></i></div>
+              <div class="step-details">
+                <span class="step-title">SSL & Protocol Inspection</span>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+            <div class="scan-step-item" id="step-2">
+              <div class="step-icon"><i class="fa-solid fa-code"></i></div>
+              <div class="step-details">
+                <span class="step-title">Heuristic & Entropy Engine</span>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+            <div class="scan-step-item" id="step-3">
+              <div class="step-icon"><i class="fa-solid fa-server"></i></div>
+              <div class="step-details">
+                <span class="step-title">Domain & Syntax Audit</span>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+            <div class="scan-step-item" id="step-4">
+              <div class="step-icon"><i class="fa-solid fa-database"></i></div>
+              <div class="step-details">
+                <span class="step-title">Threat Intelligence Lookup</span>
+                <span class="step-status">Pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scan Results Dashboard (Hidden by default until scanned) -->
+        <div id="results-dashboard" class="results-dashboard" style="display: none;">
+          
+          <!-- Summary Banner Header -->
+          <div class="results-summary-card glass-card" id="results-banner">
+            <div class="summary-left">
+              <div class="summary-badge" id="risk-badge">
+                <i class="fa-solid fa-shield-check" id="badge-icon"></i>
+                <span id="badge-text">SAFE</span>
+              </div>
+              <div class="summary-text">
+                <h2 id="result-url-title">https://example.com</h2>
+                <p id="result-summary-desc">No security threats or suspicious anomalies were detected for this domain.</p>
+              </div>
+            </div>
+            <div class="summary-actions">
+              <button id="btn-export-pdf" class="btn-secondary" title="Export printable report">
+                <i class="fa-solid fa-file-pdf"></i> Export PDF
+              </button>
+              <button id="btn-export-json" class="btn-secondary" title="Download JSON Data">
+                <i class="fa-solid fa-file-code"></i> Export JSON
+              </button>
+              <button id="btn-share-result" class="btn-secondary" title="Copy Result Link">
+                <i class="fa-solid fa-share-nodes"></i> Share
+              </button>
+            </div>
+          </div>
+
+          <!-- Dashboard Main Grid -->
+          <div class="results-grid">
+            
+            <!-- Left Column: Circular Security Score Card -->
+            <div class="score-card glass-card">
+              <h3 class="card-title"><i class="fa-solid fa-gauge-high icon-blue"></i> Security Score</h3>
+              
+              <div class="gauge-wrapper">
+                <svg class="score-gauge-svg" viewBox="0 0 200 200">
+                  <circle class="gauge-bg" cx="100" cy="100" r="80"></circle>
+                  <circle id="score-gauge-fill" class="gauge-fill" cx="100" cy="100" r="80" stroke-dasharray="502" stroke-dashoffset="502"></circle>
+                </svg>
+                <div class="gauge-center-text">
+                  <span id="score-number" class="score-value">0</span>
+                  <span class="score-denom">/ 100</span>
+                  <span id="score-label" class="score-status-text">Calculating</span>
+                </div>
+              </div>
+
+              <div class="score-meter-legend">
+                <div class="legend-item"><span class="legend-dot safe"></span> Safe (80-100)</div>
+                <div class="legend-item"><span class="legend-dot warning"></span> Suspicious (50-79)</div>
+                <div class="legend-item"><span class="legend-dot danger"></span> Dangerous (0-49)</div>
+              </div>
+            </div>
+
+            <!-- Right Column: Granular Security Checks -->
+            <div class="checks-card glass-card">
+              <h3 class="card-title"><i class="fa-solid fa-list-check icon-blue"></i> Security Inspection Breakdown</h3>
+              <div id="checks-list" class="checks-list">
+                <!-- Dynamic Check Items Injected by JS -->
+              </div>
+            </div>
+
+          </div> <!-- End results grid -->
+
+          <!-- Secondary Grid: Domain Info & Threat Intelligence -->
+          <div class="results-secondary-grid">
+            
+            <!-- Domain Information Card -->
+            <div class="info-card glass-card">
+              <h3 class="card-title"><i class="fa-solid fa-network-wired icon-blue"></i> Domain & Network Metadata</h3>
+              <ul class="info-details-list">
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-globe"></i> Domain Name</span>
+                  <span class="info-val" id="info-domain">-</span>
+                </li>
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-lock"></i> Protocol & SSL</span>
+                  <span class="info-val" id="info-protocol">-</span>
+                </li>
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-server"></i> Simulated IP Host</span>
+                  <span class="info-val" id="info-ip">-</span>
+                </li>
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-flag"></i> Top-Level Domain (TLD)</span>
+                  <span class="info-val" id="info-tld">-</span>
+                </li>
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-clock"></i> Domain Age Risk</span>
+                  <span class="info-val" id="info-age">-</span>
+                </li>
+                <li>
+                  <span class="info-label"><i class="fa-solid fa-font"></i> URL String Entropy</span>
+                  <span class="info-val" id="info-entropy">-</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Threat Intelligence APIs Card -->
+            <div class="threat-intel-card glass-card">
+              <h3 class="card-title"><i class="fa-solid fa-shield-virus icon-blue"></i> Threat Intelligence Databases</h3>
+              <div class="threat-sources-grid">
+                
+                <div class="threat-source-item">
+                  <div class="source-header">
+                    <span class="source-name"><i class="fa-brands fa-google icon-blue"></i> Google Safe Browsing</span>
+                    <span class="source-status badge-safe" id="threat-google-status">Clean</span>
+                  </div>
+                  <p class="source-desc" id="threat-google-desc">No web malware, social engineering, or phishing records.</p>
+                </div>
+
+                <div class="threat-source-item">
+                  <div class="source-header">
+                    <span class="source-name"><i class="fa-solid fa-virus icon-blue"></i> VirusTotal Engine</span>
+                    <span class="source-status badge-safe" id="threat-vt-status">0 / 92 Engine Flags</span>
+                  </div>
+                  <p class="source-desc" id="threat-vt-desc">Zero security vendors flagged this URL as malicious.</p>
+                </div>
+
+                <div class="threat-source-item">
+                  <div class="source-header">
+                    <span class="source-name"><i class="fa-solid fa-fish icon-blue"></i> PhishTank Registry</span>
+                    <span class="source-status badge-safe" id="threat-phishtank-status">Unlisted</span>
+                  </div>
+                  <p class="source-desc" id="threat-phishtank-desc">URL is not listed in active community phishing database.</p>
+                </div>
+
+                <div class="threat-source-item">
+                  <div class="source-header">
+                    <span class="source-name"><i class="fa-solid fa-bugs icon-blue"></i> URLhaus Malware Project</span>
+                    <span class="source-status badge-safe" id="threat-urlhaus-status">Clean</span>
+                  </div>
+                  <p class="source-desc" id="threat-urlhaus-desc">No active malware payload hosting associated with domain.</p>
+                </div>
+
+                <div class="threat-source-item">
+                  <div class="source-header">
+                    <span class="source-name"><i class="fa-solid fa-tower-broadcast icon-blue"></i> Live HTTP Reachability</span>
+                    <span class="source-status badge-safe" id="threat-http-status">200 OK</span>
+                  </div>
+                  <p class="source-desc" id="threat-http-desc">Website is online and actively responding over HTTP/HTTPS.</p>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div> <!-- End Results Dashboard -->
+
+      </div>
+    </section>
+
+    <!-- Scan History Section -->
+    <section id="history" class="history-section">
+      <div class="container">
+        <div class="section-header text-center">
+          <span class="section-subtitle">Local Data Vault</span>
+          <h2 class="section-title">Scan History Dashboard</h2>
+          <p class="section-description">
+            Your previous URL security audits are stored securely in your local browser storage for quick review and report exports.
+          </p>
+        </div>
+
+        <div class="history-card glass-card">
+          
+          <!-- History Controls Header -->
+          <div class="history-toolbar">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="history-search" placeholder="Search URL or domain..." autocomplete="off">
+            </div>
+
+            <div class="filter-box">
+              <select id="history-filter" class="custom-select">
+                <option value="all">All Risk Levels</option>
+                <option value="safe">🟢 Safe Only</option>
+                <option value="suspicious">🟡 Suspicious</option>
+                <option value="malicious">🔴 Malicious</option>
+              </select>
+            </div>
+
+            <div class="history-actions">
+              <button id="btn-export-history" class="btn-secondary btn-sm" title="Export history as JSON">
+                <i class="fa-solid fa-download"></i> Export JSON
+              </button>
+              <button id="btn-clear-history" class="btn-danger btn-sm" title="Clear all scan history">
+                <i class="fa-solid fa-trash-can"></i> Clear History
+              </button>
+            </div>
+          </div>
+
+          <!-- History Table -->
+          <div class="table-responsive">
+            <table class="history-table" id="history-table">
+              <thead>
+                <tr>
+                  <th>URL / Domain</th>
+                  <th>Security Score</th>
+                  <th>Risk Status</th>
+                  <th>Timestamp</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <!-- Dynamically populated by JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="history-empty" class="history-empty-state" style="display: none;">
+            <i class="fa-solid fa-folder-open empty-icon"></i>
+            <h4>No Scan History Found</h4>
+            <p>Enter a website URL in the scanner above to generate your first security report.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+      <div class="container">
+        <div class="section-header text-center">
+          <span class="section-subtitle">Enterprise Protection</span>
+          <h2 class="section-title">Core Security Features</h2>
+          <p class="section-description">
+            Everything you need to audit, inspect, and evaluate suspicious links before clicking.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box blue">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <h3>Instant URL Analysis</h3>
+            <p>Perform multi-layered heuristic security scans in under 1.5 seconds without sending sensitive data to unauthorized third parties.</p>
+          </div>
+
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box green">
+              <i class="fa-solid fa-brain"></i>
+            </div>
+            <h3>AI Heuristic Engine</h3>
+            <p>Detect typosquatting, brand impersonation, high-entropy random domains, and deceptive phishing keyword structures automatically.</p>
+          </div>
+
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box purple">
+              <i class="fa-solid fa-database"></i>
+            </div>
+            <h3>Threat Intelligence APIs</h3>
+            <p>Aggregates intelligence from Google Safe Browsing, VirusTotal engines, PhishTank, and URLhaus malware feeds.</p>
+          </div>
+
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box orange">
+              <i class="fa-solid fa-file-pdf"></i>
+            </div>
+            <h3>PDF Security Reports</h3>
+            <p>Generate clean, executive-ready PDF cybersecurity audit documents complete with risk badges and domain metadata.</p>
+          </div>
+
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box cyan">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <h3>Local Storage Vault</h3>
+            <p>Keep track of all checked links locally inside your browser with search, risk filtering, and JSON export support.</p>
+          </div>
+
+          <div class="feature-card glass-card">
+            <div class="feature-icon-box red">
+              <i class="fa-solid fa-mobile-screen"></i>
+            </div>
+            <h3>Responsive SaaS Dashboard</h3>
+            <p>Designed with modern glassmorphism aesthetic, sleek light cybersecurity palette, and responsive mobile optimization.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-section">
+      <div class="container">
+        <div class="section-header text-center">
+          <span class="section-subtitle">Simple 3-Step Process</span>
+          <h2 class="section-title">How ShieldURL Works</h2>
+          <p class="section-description">
+            Automated intelligence that converts complex security parameters into an intuitive safety score.
+          </p>
+        </div>
+
+        <div class="timeline-steps">
+          
+          <div class="step-card glass-card">
+            <div class="step-number">01</div>
+            <div class="step-icon-large">
+              <i class="fa-solid fa-keyboard"></i>
+            </div>
+            <h3>1. Input Target URL</h3>
+            <p>Copy and paste any suspicious website link, shortener URL, or domain address into the scanner bar.</p>
+          </div>
+
+          <div class="step-connector"><i class="fa-solid fa-arrow-right"></i></div>
+
+          <div class="step-card glass-card">
+            <div class="step-number">02</div>
+            <div class="step-icon-large">
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <h3>2. Heuristic AI Audit</h3>
+            <p>Our engine evaluates protocol SSL, TLD risk, domain entropy, brand impersonation, and threat database records.</p>
+          </div>
+
+          <div class="step-connector"><i class="fa-solid fa-arrow-right"></i></div>
+
+          <div class="step-card glass-card">
+            <div class="step-number">03</div>
+            <div class="step-icon-large">
+              <i class="fa-solid fa-shield-circle-check"></i>
+            </div>
+            <h3>3. Complete Safety Report</h3>
+            <p>View your 0-100 Security Score, granular check breakdown, threat intelligence status, and export PDF audits.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- User Authentication Modal (Login / Sign Up / One-Click Demo) -->
+  <div id="auth-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card glass-card auth-modal-card">
+      <div class="modal-header">
+        <h3 id="auth-modal-title"><i class="fa-solid fa-user-shield icon-blue"></i> Analyst Authentication</h3>
+        <button id="btn-close-auth-modal" class="btn-close">&times;</button>
+      </div>
+
+      <!-- Auth Tab Switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab-btn active" id="tab-login-btn">Sign In</button>
+        <button class="auth-tab-btn" id="tab-signup-btn">Create Account</button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- One-Click Instant Demo Login Banner -->
+        <div class="demo-auth-banner">
+          <p><i class="fa-solid fa-wand-magic-sparkles"></i> Testing the platform? Try instant preview:</p>
+          <button id="btn-demo-login" class="btn-secondary btn-sm btn-full">
+            <i class="fa-solid fa-bolt"></i> One-Click Demo Analyst Login
+          </button>
+        </div>
+
+        <div class="auth-divider"><span>OR</span></div>
+
+        <!-- Login Form View -->
+        <form id="login-form" class="auth-form">
+          <div class="form-group">
+            <label for="login-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+            <input type="email" id="login-email" placeholder="analyst@company.com" required class="modal-input">
+          </div>
+          <div class="form-group">
+            <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" id="login-password" placeholder="••••••••" required class="modal-input">
+          </div>
+          <div class="form-options">
+            <label><input type="checkbox" id="login-remember" checked> Remember Session</label>
+            <a href="#" id="link-forgot-pass">Forgot Password?</a>
+          </div>
+          <button type="submit" class="btn-primary btn-full margin-top-md">
+            <i class="fa-solid fa-right-to-bracket"></i> Sign In to Dashboard
+          </button>
+        </form>
+
+        <!-- Sign Up Form View (Hidden by default) -->
+        <form id="signup-form" class="auth-form" style="display: none;">
+          <div class="form-group">
+            <label for="signup-name"><i class="fa-solid fa-user"></i> Full Name</label>
+            <input type="text" id="signup-name" placeholder="Alex Security" required class="modal-input">
+          </div>
+          <div class="form-group">
+            <label for="signup-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+            <input type="email" id="signup-email" placeholder="alex@cybersec.io" required class="modal-input">
+          </div>
+          <div class="form-group">
+            <label for="signup-password"><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" id="signup-password" placeholder="••••••••" required class="modal-input">
+          </div>
+          <button type="submit" class="btn-primary btn-full margin-top-md">
+            <i class="fa-solid fa-user-plus"></i> Create Analyst Account
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Threat API Settings Modal -->
+  <div id="api-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key icon-blue"></i> Configure Live Threat Intelligence API Keys</h3>
+        <button id="btn-close-modal" class="btn-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">
+          Connect your live API keys below to enable real-time queries against 90+ antivirus vendors on <strong>VirusTotal</strong> and official <strong>Google Safe Browsing v4</strong> threat databases.
+        </p>
+
+        <div class="form-group">
+          <div class="label-with-action">
+            <label for="vt-api-key"><i class="fa-solid fa-virus"></i> VirusTotal API Key (v3)</label>
+            <a href="https://www.virustotal.com/gui/my-api-key" target="_blank" rel="noopener" class="api-help-link"><i class="fa-solid fa-external-link"></i> Get Free Key</a>
+          </div>
+          <div class="input-with-btn">
+            <input type="password" id="vt-api-key" placeholder="64-character VirusTotal API key..." class="modal-input">
+            <button type="button" id="btn-test-vt" class="btn-secondary btn-sm" title="Test VirusTotal Key">
+              <i class="fa-solid fa-vial"></i> Test
+            </button>
+          </div>
+          <small class="api-status-hint" id="vt-status-hint">Status: <span class="badge-neutral">Not Configured</span></small>
+        </div>
+
+        <div class="form-group margin-top-md">
+          <div class="label-with-action">
+            <label for="gsb-api-key"><i class="fa-brands fa-google"></i> Google Safe Browsing API Key (v4)</label>
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="api-help-link"><i class="fa-solid fa-external-link"></i> Get Free Key</a>
+          </div>
+          <div class="input-with-btn">
+            <input type="password" id="gsb-api-key" placeholder="Google Safe Browsing API key..." class="modal-input">
+            <button type="button" id="btn-test-gsb" class="btn-secondary btn-sm" title="Test Google Key">
+              <i class="fa-solid fa-vial"></i> Test
+            </button>
+          </div>
+          <small class="api-status-hint" id="gsb-status-hint">Status: <span class="badge-neutral">Not Configured</span></small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-keys" class="btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Save API Keys
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-container">
+      <div class="footer-brand">
+        <a href="#home" class="brand-logo">
+          <div class="logo-icon-wrapper">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <span class="brand-name">Shield<span class="highlight">URL</span></span>
+        </a>
+        <p class="footer-tagline">
+          AI-Powered Website Security & Phishing Detection Platform. Built for safe browsing and link verification.
+        </p>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-col">
+          <h4>Navigation</h4>
+          <ul>
+            <li><a href="#home">Home</a></li>
+            <li><a href="#scanner">URL Scanner</a></li>
+            <li><a href="#dashboard">Dashboard</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#history">Scan History</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Security Tools</h4>
+          <ul>
+            <li><a href="#scanner">Heuristic Analyzer</a></li>
+            <li><a href="#scanner">Phishing Detector</a></li>
+            <li><a href="#scanner">Malware Checker</a></li>
+            <li><a href="#scanner">SSL Protocol Audit</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <div class="social-links">
+            <a href="https://github.com" target="_blank" rel="noopener" aria-label="GitHub Repository"><i class="fa-brands fa-github"></i></a>
+            <a href="https://twitter.com" target="_blank" rel="noopener" aria-label="Twitter Profile"><i class="fa-brands fa-twitter"></i></a>
+            <a href="https://linkedin.com" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fa-brands fa-linkedin"></i></a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="container footer-bottom-container">
+        <p>&copy; 2026 ShieldURL Inc. All rights reserved. Royalty-free Cybersecurity Portfolio Application.</p>
+        <div class="legal-links">
+          <a href="#">Privacy Policy</a>
+          <span>•</span>
+          <a href="#">Terms of Service</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Printable PDF Section (Visible only when generating PDF/printing) -->
+  <div id="print-report" class="print-report-container" style="display: none;">
+    <!-- Populated by script.js during PDF print generation -->
+  </div>
+
+  <!-- JavaScript -->
+  <script src="script.js"></script>
+</body>
+</html>

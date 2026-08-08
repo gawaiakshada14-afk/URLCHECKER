@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="secGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <rect x="50" y="50" width="500" height="400" rx="24" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2" />
+  
+  <!-- Outer Scanner Radar Circle -->
+  <circle cx="300" cy="240" r="140" fill="none" stroke="#DBEAFE" stroke-width="3" />
+  <circle cx="300" cy="240" r="95" fill="none" stroke="#93C5FD" stroke-width="2" stroke-dasharray="6,6" />
+  <circle cx="300" cy="240" r="45" fill="none" stroke="#2563EB" stroke-width="2" />
+
+  <!-- Shield Core -->
+  <path d="M 300 170 C 340 170 355 182 355 220 C 355 270 315 295 300 305 C 285 295 245 270 245 220 C 245 182 260 170 300 170 Z" fill="url(#secGrad)" filter="url(#shadow)" />
+  <path d="M 288 238 L 296 246 L 314 228" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Threat Radar Dots & Nodes -->
+  <circle cx="210" cy="160" r="10" fill="#10B981" />
+  <line x1="210" y1="160" x2="255" y2="190" stroke="#10B981" stroke-width="2" stroke-dasharray="3,3" />
+
+  <circle cx="390" cy="150" r="12" fill="#F59E0B" />
+  <line x1="390" y1="150" x2="345" y2="185" stroke="#F59E0B" stroke-width="2" stroke-dasharray="3,3" />
+
+  <circle cx="410" cy="310" r="14" fill="#EF4444" />
+  <line x1="410" y1="310" x2="345" y2="280" stroke="#EF4444" stroke-width="2" stroke-dasharray="3,3" />
+
+  <!-- Security Scan Badges -->
+  <rect x="90" y="360" width="130" height="40" rx="10" fill="#FFFFFF" filter="url(#shadow)" />
+  <text x="110" y="384" font-family="sans-serif" font-size="12" font-weight="bold" fill="#10B981">✓ Malware Free</text>
+
+  <rect x="380" y="360" width="140" height="40" rx="10" fill="#FFFFFF" filter="url(#shadow)" />
+  <text x="400" y="384" font-family="sans-serif" font-size="12" font-weight="bold" fill="#2563EB">⚡ Heuristic AI</text>
+</svg>
