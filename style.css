@@ -97,9 +97,10 @@ ul {
 }
 
 .container {
-  max-width: 1240px;
+  max-width: 1380px;
+  width: 100%;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 1.25rem;
 }
 
 /* Glassmorphism Card Style */
@@ -202,6 +203,13 @@ ul {
   padding: 0.5rem 1rem;
 }
 
+.btn-xs {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--border-radius-md);
+  white-space: nowrap;
+}
+
 /* --------------------------------------------------------------------------
    4. Header & User Authentication Dropdown
    -------------------------------------------------------------------------- */
@@ -209,38 +217,42 @@ ul {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
-  padding: 1rem 0;
+  padding: 0.85rem 0;
 }
 
 .nav-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
 }
 
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.45rem;
   font-family: 'Poppins', sans-serif;
   font-weight: 800;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   color: var(--text-main);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .logo-icon-wrapper {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   background: linear-gradient(135deg, var(--primary) 0%, #0284C7 100%);
   color: #FFFFFF;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
@@ -254,7 +266,7 @@ ul {
   text-transform: uppercase;
   background: var(--primary-light);
   color: var(--primary);
-  padding: 0.2rem 0.5rem;
+  padding: 0.15rem 0.45rem;
   border-radius: var(--border-radius-full);
   border: 1px solid var(--primary-border);
 }
@@ -262,16 +274,19 @@ ul {
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 1.75rem;
+  gap: 0.85rem;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .nav-link {
   color: var(--text-muted);
   font-weight: 500;
-  font-size: 0.925rem;
+  font-size: 0.84rem;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  white-space: nowrap;
   transition: color var(--transition-fast);
 }
 
@@ -280,34 +295,52 @@ ul {
 }
 
 .nav-icon {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+#auth-nav-container {
+  flex-shrink: 0;
 }
 
 /* User Profile Dropdown */
 .user-profile-dropdown {
   position: relative;
+  flex-shrink: 0;
 }
 
 .user-profile-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   background: #FFFFFF;
   border: 1px solid var(--border-color);
-  padding: 0.35rem 0.85rem 0.35rem 0.4rem;
+  padding: 0.25rem 0.55rem 0.25rem 0.3rem;
   border-radius: var(--border-radius-full);
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main);
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.user-display-name {
+  max-width: 85px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .user-profile-btn:hover {
@@ -1423,8 +1456,9 @@ ul {
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
 }
 
 .feature-card {
@@ -1873,7 +1907,51 @@ ul {
 /* --------------------------------------------------------------------------
    16. Media Queries & Responsive Layout
    -------------------------------------------------------------------------- */
-@media (max-width: 992px) {
+@media (max-width: 1380px) {
+  .nav-menu {
+    gap: 0.65rem;
+  }
+  .nav-link {
+    font-size: 0.81rem;
+    padding: 0.2rem 0.35rem;
+  }
+  .btn-xs span {
+    display: none;
+  }
+  .db-status-indicator span {
+    display: none;
+  }
+  .db-status-indicator {
+    padding: 0.35rem 0.5rem;
+  }
+}
+
+@media (max-width: 1050px) {
+  .nav-menu {
+    position: fixed;
+    top: 65px;
+    left: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(16px);
+    flex-direction: column;
+    padding: 1.75rem 2rem;
+    gap: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    transform: translateY(-150%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-lg);
+    z-index: 99;
+  }
+  
+  .nav-menu.mobile-open {
+    transform: translateY(0);
+  }
+  
+  .mobile-toggle {
+    display: block;
+  }
+
   .hero-container {
     grid-template-columns: 1fr;
     text-align: center;
@@ -1922,29 +2000,6 @@ ul {
 }
 
 @media (max-width: 768px) {
-  .nav-menu {
-    position: fixed;
-    top: 70px;
-    left: 0;
-    width: 100%;
-    background: #FFFFFF;
-    flex-direction: column;
-    padding: 2rem;
-    gap: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    transform: translateY(-150%);
-    transition: transform 0.3s ease;
-    box-shadow: var(--shadow-lg);
-  }
-  
-  .nav-menu.mobile-open {
-    transform: translateY(0);
-  }
-  
-  .mobile-toggle {
-    display: block;
-  }
-
   .url-input-form {
     flex-direction: column;
   }
@@ -2059,5 +2114,219 @@ ul {
 
 .db-status-indicator.offline i {
   color: #EF4444;
+}
+
+/* --------------------------------------------------------------------------
+   18. AI Assistant Slide-Out Drawer & Admin Panel Styles
+   -------------------------------------------------------------------------- */
+.btn-ai-pulse {
+  background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-ai-pulse:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
+}
+
+/* AI Slide-Out Drawer */
+.ai-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 100vw;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.15);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-color);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.ai-drawer-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.ai-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.ai-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.ai-drawer-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0; }
+.ai-drawer-subtitle { font-size: 0.75rem; color: var(--text-muted); }
+
+.ai-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ai-message { display: flex; flex-direction: column; }
+.ai-message.user { align-items: flex-end; }
+.ai-message.bot { align-items: flex-start; }
+
+.message-bubble {
+  max-width: 85%;
+  padding: 0.85rem 1.1rem;
+  border-radius: 16px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.ai-message.bot .message-bubble {
+  background: #F1F5F9;
+  color: var(--text-main);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.ai-message.user .message-bubble {
+  background: var(--primary-color);
+  color: #FFFFFF;
+  border-bottom-right-radius: 4px;
+}
+
+.ai-quick-prompts {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  overflow-x: auto;
+  border-top: 1px solid var(--border-color);
+  background: #FAFAFA;
+}
+
+.prompt-pill {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prompt-pill:hover {
+  background: var(--primary-light);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.ai-drawer-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.ai-chat-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ai-chat-input-wrapper input {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  font-size: 0.88rem;
+}
+
+/* Admin Panel Tabs & System Health Grid */
+.admin-modal-card {
+  max-width: 650px;
+  width: 90%;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: #F8FAFC;
+}
+
+.admin-tab-btn {
+  padding: 0.75rem 1.1rem;
+  border: none;
+  background: none;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.admin-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.system-health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.health-card {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  padding: 1rem;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.health-label { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.health-value { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
+
+/* Skeleton Wave Loading Animation */
+.skeleton-card {
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+  height: 90px;
+  margin-bottom: 1rem;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 

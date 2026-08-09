@@ -38,7 +38,7 @@
         <a href="#scanner" class="nav-link"><i class="fa-solid fa-radar nav-icon"></i> Scanner</a>
         <a href="#dashboard" class="nav-link" id="nav-dashboard-link"><i class="fa-solid fa-chart-line nav-icon"></i> Dashboard</a>
         <a href="#features" class="nav-link"><i class="fa-solid fa-cubes nav-icon"></i> Features</a>
-        <a href="#how-it-works" class="nav-link"><i class="fa-solid fa-diagram-project nav-icon"></i> How It Works</a>
+        <a href="#how-it-works" class="nav-link"><i class="fa-solid fa-diagram-project nav-icon"></i> Process</a>
         <a href="#history" class="nav-link"><i class="fa-solid fa-clock-rotate-left nav-icon"></i> History</a>
       </nav>
 
@@ -47,20 +47,28 @@
           <i class="fa-solid fa-database"></i> <span id="db-status-text">Supabase DB</span>
         </div>
 
-        <button id="btn-api-modal" class="btn-secondary btn-sm" title="Configure Threat API Keys">
-          <i class="fa-solid fa-key"></i> API Keys
+        <button id="btn-api-modal" class="btn-secondary btn-xs" title="Configure Threat API Keys">
+          <i class="fa-solid fa-key"></i> <span>API Keys</span>
+        </button>
+
+        <button id="btn-admin-modal" class="btn-secondary btn-xs" title="Admin Operations & Settings">
+          <i class="fa-solid fa-sliders"></i> <span>Admin</span>
+        </button>
+
+        <button id="btn-open-ai-drawer" class="btn-primary btn-xs btn-ai-pulse" title="Ask AI Security Analyst Assistant">
+          <i class="fa-solid fa-robot"></i> <span>AI Analyst</span>
         </button>
 
         <!-- Dynamic Authentication & User Profile Component -->
         <div id="auth-nav-container">
-          <button id="btn-open-auth" class="btn-secondary btn-sm">
-            <i class="fa-solid fa-user"></i> Sign In / Register
+          <button id="btn-open-auth" class="btn-secondary btn-xs">
+            <i class="fa-solid fa-user"></i> Sign In
           </button>
           
           <div id="user-profile-menu" class="user-profile-dropdown" style="display: none;">
             <button id="btn-user-dropdown" class="user-profile-btn">
               <div class="user-avatar" id="user-avatar-initials">AS</div>
-              <span class="user-display-name" id="user-display-name">Alex Security</span>
+              <span class="user-display-name" id="user-display-name">Alex</span>
               <i class="fa-solid fa-chevron-down"></i>
             </button>
             <div id="user-dropdown-content" class="dropdown-content glass-card" style="display: none;">
@@ -72,16 +80,14 @@
               <a href="#dashboard" class="dropdown-item"><i class="fa-solid fa-gauge"></i> Executive Dashboard</a>
               <a href="#history" class="dropdown-item"><i class="fa-solid fa-clock-rotate-left"></i> My Scan Vault</a>
               <a href="#scanner" class="dropdown-item"><i class="fa-solid fa-plus"></i> New Security Audit</a>
+              <button type="button" class="dropdown-item" onclick="document.getElementById('btn-api-modal').click()"><i class="fa-solid fa-key"></i> API Keys Settings</button>
+              <button type="button" class="dropdown-item" onclick="document.getElementById('btn-admin-modal').click()"><i class="fa-solid fa-sliders"></i> Admin Control Panel</button>
               <hr class="dropdown-divider">
               <button id="btn-logout" class="dropdown-item text-danger"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
             </div>
           </div>
         </div>
 
-        <a href="#scanner" class="btn-primary btn-sm">
-          <i class="fa-solid fa-bolt"></i> Quick Scan
-        </a>
-        
         <button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle navigation menu">
           <i class="fa-solid fa-bars"></i>
         </button>
@@ -567,6 +573,9 @@
             </div>
 
             <div class="history-actions">
+              <button id="btn-export-csv" class="btn-secondary btn-sm" title="Export history as CSV">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
+              </button>
               <button id="btn-export-history" class="btn-secondary btn-sm" title="Export history as JSON">
                 <i class="fa-solid fa-download"></i> Export JSON
               </button>
@@ -827,12 +836,139 @@
           </div>
           <small class="api-status-hint" id="gsb-status-hint">Status: <span class="badge-neutral">Not Configured</span></small>
         </div>
+
+        <div class="form-group margin-top-md">
+          <label for="webhook-url-input"><i class="fa-solid fa-bell"></i> Slack / Discord Alert Webhook URL</label>
+          <input type="url" id="webhook-url-input" placeholder="https://hooks.slack.com/services/..." class="modal-input">
+          <small class="api-status-hint">Triggers automated alert payloads whenever a 🔴 Malicious URL is scanned.</small>
+        </div>
       </div>
       <div class="modal-footer">
         <button id="btn-save-keys" class="btn-primary">
-          <i class="fa-solid fa-floppy-disk"></i> Save API Keys
+          <i class="fa-solid fa-floppy-disk"></i> Save Settings
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Admin Operations & Settings Modal -->
+  <div id="admin-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card glass-card admin-modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-sliders icon-blue"></i> Executive Operations & Admin Control Panel</h3>
+        <button id="btn-close-admin-modal" class="btn-close">&times;</button>
+      </div>
+      
+      <div class="admin-tabs">
+        <button class="admin-tab-btn active" id="tab-admin-keys">API Keys & Webhooks</button>
+        <button class="admin-tab-btn" id="tab-admin-users">Analyst Accounts</button>
+        <button class="admin-tab-btn" id="tab-admin-system">System Health</button>
+      </div>
+
+      <div class="modal-body admin-modal-body">
+        
+        <!-- Tab 1: API Keys & Webhooks -->
+        <div id="view-admin-keys" class="admin-tab-content">
+          <h4><i class="fa-solid fa-key"></i> Active Threat API Configuration</h4>
+          <p class="text-muted">Manage global VirusTotal, Google Safe Browsing v4 keys and automated incident response Webhooks.</p>
+          <form id="admin-keys-form" class="margin-top-md">
+            <div class="form-group">
+              <label>VirusTotal v3 Key</label>
+              <input type="password" id="admin-vt-key" class="modal-input" placeholder="VirusTotal 64-char API key...">
+            </div>
+            <div class="form-group margin-top-sm">
+              <label>Google Safe Browsing v4 Key</label>
+              <input type="password" id="admin-gsb-key" class="modal-input" placeholder="Google Safe Browsing API key...">
+            </div>
+            <div class="form-group margin-top-sm">
+              <label>Slack / Discord Webhook URL</label>
+              <input type="url" id="admin-webhook-url" class="modal-input" placeholder="https://hooks.slack.com/services/...">
+            </div>
+            <button type="submit" class="btn-primary margin-top-md"><i class="fa-solid fa-floppy-disk"></i> Save Admin Settings</button>
+          </form>
+        </div>
+
+        <!-- Tab 2: User Accounts List -->
+        <div id="view-admin-users" class="admin-tab-content" style="display: none;">
+          <h4><i class="fa-solid fa-users"></i> Registered Analyst Accounts</h4>
+          <div class="table-responsive margin-top-sm">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Analyst Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 3: System Diagnostics -->
+        <div id="view-admin-system" class="admin-tab-content" style="display: none;">
+          <h4><i class="fa-solid fa-microchip"></i> System Infrastructure Diagnostics</h4>
+          <div class="system-health-grid margin-top-sm">
+            <div class="health-card">
+              <span class="health-label">Database Status</span>
+              <span class="health-value text-success" id="diag-db-status"><i class="fa-solid fa-circle-check"></i> Connected</span>
+            </div>
+            <div class="health-card">
+              <span class="health-label">Database Provider</span>
+              <span class="health-value">Supabase PostgreSQL</span>
+            </div>
+            <div class="health-card">
+              <span class="health-label">Rate Limiter</span>
+              <span class="health-value text-success">Active (40 req/min)</span>
+            </div>
+            <div class="health-card">
+              <span class="health-label">API Gateway</span>
+              <span class="health-value">Express.js (Port 3000)</span>
+            </div>
+          </div>
+          <button id="btn-reinit-db" class="btn-secondary btn-sm margin-top-md"><i class="fa-solid fa-rotate"></i> Re-initialize Supabase Schema & Seed</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Cybersecurity Analyst Assistant Slide-Out Drawer -->
+  <div id="ai-assistant-drawer" class="ai-drawer" style="display: none;">
+    <div class="ai-drawer-header">
+      <div class="ai-title-wrapper">
+        <div class="ai-avatar"><i class="fa-solid fa-robot"></i></div>
+        <div>
+          <h3 class="ai-drawer-title">ShieldURL AI Analyst</h3>
+          <small class="ai-drawer-subtitle">Real-Time Security Intelligence Assistant</small>
+        </div>
+      </div>
+      <button id="btn-close-ai-drawer" class="btn-close">&times;</button>
+    </div>
+
+    <div class="ai-drawer-body" id="ai-chat-body">
+      <div class="ai-message bot">
+        <div class="message-bubble">
+          👋 Hello Analyst! I am your AI Cybersecurity Assistant. Ask me to break down scanned URL risks, explain Shannon Entropy, or recommend incident response steps.
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested Quick Action Prompt Pills -->
+    <div class="ai-quick-prompts">
+      <button class="prompt-pill" data-prompt="What is Shannon Entropy?"><i class="fa-solid fa-lightbulb"></i> What is Entropy?</button>
+      <button class="prompt-pill" data-prompt="What incident response steps should I take for malicious links?"><i class="fa-solid fa-shield"></i> Incident Response</button>
+      <button class="prompt-pill" data-prompt="Why is HTTP unencrypted protocol dangerous?"><i class="fa-solid fa-lock-open"></i> SSL Risks</button>
+    </div>
+
+    <div class="ai-drawer-footer">
+      <form id="ai-chat-form" class="ai-chat-input-wrapper">
+        <input type="text" id="ai-prompt-input" placeholder="Ask AI Analyst anything..." required autocomplete="off">
+        <button type="submit" class="btn-primary btn-icon"><i class="fa-solid fa-paper-plane"></i></button>
+      </form>
     </div>
   </div>
 

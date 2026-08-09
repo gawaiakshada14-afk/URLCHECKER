@@ -42,8 +42,8 @@ CREATE TABLE scan_history (
     url TEXT NOT NULL,
     domain VARCHAR(255) NOT NULL,
     score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
-    status VARCHAR(50) NOT NULL,
-    risk_level VARCHAR(50) NOT NULL,
+    status TEXT NOT NULL,
+    risk_level TEXT NOT NULL,
     checks_json JSONB DEFAULT '[]'::jsonb,
     metadata_json JSONB DEFAULT '{}'::jsonb,
     scan_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -60,5 +60,6 @@ CREATE TABLE api_keys (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     vt_key TEXT DEFAULT '',
     gsb_key TEXT DEFAULT '',
+    webhook_url TEXT DEFAULT '',
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

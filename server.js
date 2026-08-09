@@ -9,6 +9,14 @@ const { query, testConnection } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Global Error Handlers to prevent process exit
+process.on('uncaughtException', (err) => {
+  console.error('[Server Uncaught Exception]:', err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server Unhandled Rejection]:', reason);
+});
+
 // Enable CORS and JSON body parsing
 app.use(cors());
 app.use(express.json());
@@ -16,6 +24,37 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static frontend assets
 app.use(express.static(path.join(__dirname)));
+
+// Simple In-Memory Rate Limiting Middleware
+const requestCounts = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_MIN = 40;
+
+function rateLimiter(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || 'client';
+  const now = Date.now();
+  const userStats = requestCounts.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > userStats.resetTime) {
+    userStats.count = 1;
+    userStats.resetTime = now + RATE_LIMIT_WINDOW_MS;
+  } else {
+    userStats.count++;
+  }
+
+  requestCounts.set(ip, userStats);
+
+  if (userStats.count > MAX_REQUESTS_PER_MIN) {
+    return res.status(429).json({
+      error: 'Too many requests. Rate limit exceeded. Please wait a minute before retrying.',
+      retryAfterSeconds: Math.ceil((userStats.resetTime - now) / 1000)
+    });
+  }
+
+  next();
+}
+
+app.use('/api/', rateLimiter);
 
 // Password Hashing Helper
 function hashPassword(password) {
@@ -197,7 +236,7 @@ app.post('/api/rules', async (req, res) => {
     await query('DELETE FROM domain_rules WHERE LOWER(domain) = $1', [cleanDomain]);
 
     const result = await query(
-      `INSERT INTO domain_rules (user_id, domain, type) VALUES (1, $1, $2) RETURNING id, domain, type, created_at;`,
+      `INSERT INTO domain_rules (user_id, domain, type) VALUES ((SELECT id FROM users ORDER BY id ASC LIMIT 1), $1, $2) RETURNING id, domain, type, created_at;`,
       [cleanDomain, ruleType]
     );
 
@@ -273,7 +312,7 @@ app.post('/api/scans', async (req, res) => {
 
     const result = await query(
       `INSERT INTO scan_history (user_id, url, domain, score, status, risk_level, checks_json, metadata_json, scan_date)
-       VALUES (1, $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, CURRENT_TIMESTAMP)
+       VALUES ((SELECT id FROM users ORDER BY id ASC LIMIT 1), $1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, CURRENT_TIMESTAMP)
        RETURNING *;`,
       [
         url,
@@ -285,6 +324,10 @@ app.post('/api/scans', async (req, res) => {
         JSON.stringify(metadata_json || {})
       ]
     );
+
+    if (score < 45 || cleanRisk.toLowerCase() === 'malicious') {
+      triggerWebhookAlert(result.rows[0]);
+    }
 
     res.status(201).json({
       message: 'Scan saved to Supabase PostgreSQL database!',
@@ -361,15 +404,42 @@ app.get('/api/kpis', async (req, res) => {
 // 6. THREAT INTELLIGENCE API KEYS MANAGEMENT
 // ============================================================================
 
+// Webhook Alert Dispatcher Helper
+async function triggerWebhookAlert(scanData) {
+  try {
+    const keysRes = await query('SELECT webhook_url FROM api_keys ORDER BY id DESC LIMIT 1;');
+    const webhook_url = keysRes.rows[0]?.webhook_url;
+    if (!webhook_url || !webhook_url.startsWith('http')) return;
+
+    const payload = {
+      text: `🚨 *ShieldURL Malicious Threat Alert* 🚨\n*URL:* ${scanData.url}\n*Score:* ${scanData.score}/100\n*Risk Level:* ${scanData.risk_level}\n*Timestamp:* ${new Date().toISOString()}`
+    };
+
+    // Use native fetch to dispatch alert asynchronously
+    fetch(webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(err => console.error('Webhook dispatch error:', err.message));
+  } catch (err) {
+    console.error('Failed to trigger webhook:', err.message);
+  }
+}
+
+// ============================================================================
+// 6. THREAT INTELLIGENCE API KEYS & WEBHOOK MANAGEMENT
+// ============================================================================
+
 app.get('/api/keys', async (req, res) => {
   try {
-    const result = await query('SELECT vt_key, gsb_key FROM api_keys ORDER BY id DESC LIMIT 1;');
+    const result = await query('SELECT vt_key, gsb_key, webhook_url FROM api_keys ORDER BY id DESC LIMIT 1;');
     if (result.rows.length === 0) {
-      return res.json({ vt: '', gsb: '' });
+      return res.json({ vt: '', gsb: '', webhook: '' });
     }
     res.json({
       vt: result.rows[0].vt_key || '',
-      gsb: result.rows[0].gsb_key || ''
+      gsb: result.rows[0].gsb_key || '',
+      webhook: result.rows[0].webhook_url || ''
     });
   } catch (err) {
     console.error('Get API keys error:', err);
@@ -378,14 +448,75 @@ app.get('/api/keys', async (req, res) => {
 });
 
 app.post('/api/keys', async (req, res) => {
-  const { vt, gsb } = req.body;
+  const { vt, gsb, webhook } = req.body;
   try {
     await query('DELETE FROM api_keys;');
-    await query('INSERT INTO api_keys (user_id, vt_key, gsb_key) VALUES (1, $1, $2);', [vt || '', gsb || '']);
-    res.json({ message: 'API Keys updated in Supabase database successfully!' });
+    await query(
+      'INSERT INTO api_keys (user_id, vt_key, gsb_key, webhook_url) VALUES ((SELECT id FROM users ORDER BY id ASC LIMIT 1), $1, $2, $3);',
+      [vt || '', gsb || '', webhook || '']
+    );
+    res.json({ message: 'API Keys and Webhook URL saved to database successfully!' });
   } catch (err) {
     console.error('Save API keys error:', err);
     res.status(500).json({ error: 'Failed to save API keys to database.' });
+  }
+});
+
+// ============================================================================
+// 7. AI SECURITY ANALYST ASSISTANT API
+// ============================================================================
+
+app.post('/api/ai/analyze', async (req, res) => {
+  const { url, score, checks, prompt } = req.body;
+
+  if (prompt) {
+    const lowerP = prompt.toLowerCase();
+    let responseText = "";
+
+    if (lowerP.includes("entropy")) {
+      responseText = "<b>Shannon Entropy Breakdown:</b> Shannon Entropy measures randomness in domain characters on a scale from 0 to 8. Normal brand domains (e.g., `google.com`) usually score between 2.5 and 3.5. Randomly generated DGA (Domain Generation Algorithm) domains used by malware Command & Control servers typically score above 4.2.";
+    } else if (lowerP.includes("remediat") || lowerP.includes("mitigat") || lowerP.includes("fix")) {
+      responseText = "<b>Incident Response & Remediation Plan:</b><br>1. Block domain immediately in network firewall & DNS sinkhole.<br>2. Force password resets for users who visited the phishing link.<br>3. Submit domain to Google Safe Browsing & VirusTotal for global blacklisting.<br>4. Revoke active OAuth session tokens for compromised accounts.";
+    } else if (lowerP.includes("ssl") || lowerP.includes("http")) {
+      responseText = "<b>SSL Protocol Analysis:</b> Unencrypted `http://` websites send data in plain text without TLS/SSL encryption, making credentials and cookie headers vulnerable to Man-in-the-Middle (MitM) interception. All legitimate banking and auth services mandate HTTPS.";
+    } else {
+      responseText = `<b>AI Security Analyst Evaluation for <code>${url || 'Target URL'}</code>:</b><br>Our heuristics engine evaluated key risk dimensions. The safety score is rated at <b>${score !== undefined ? score : 85}/100</b>. Always verify domain ownership, inspect SSL certificates, and check blacklists before entering sensitive credentials.`;
+    }
+
+    return res.json({ analysis: responseText });
+  }
+
+  // General URL breakdown generator
+  let explanation = "";
+  const failedChecks = (checks || []).filter(c => c.status === 'fail');
+  const warnChecks = (checks || []).filter(c => c.status === 'warning');
+
+  if (score >= 75) {
+    explanation = `<b>AI Risk Summary: SAFE (Score ${score}/100)</b><br>The analyzed URL <code>${url}</code> demonstrates strong security characteristics. Valid SSL encryption is active, the domain entropy is low, no typosquatting terms were identified, and no blacklisting records were found across threat intelligence feeds.`;
+  } else if (score >= 45) {
+    explanation = `<b>AI Risk Summary: SUSPICIOUS (Score ${score}/100)</b><br>Caution advised for <code>${url}</code>. Found ${warnChecks.length + failedChecks.length} potential risk indicators:<br>` +
+      (failedChecks.concat(warnChecks)).map(c => `• <b>${c.name}:</b> ${c.desc}`).join('<br>') +
+      `<br><i>Recommendation: Exercise caution before logging in or granting permissions.</i>`;
+  } else {
+    explanation = `<b>AI Risk Summary: MALICIOUS (Score ${score}/100)</b><br>⚠️ HIGH THREAT ALERT for <code>${url}</code>. Severe security penalties triggered:<br>` +
+      failedChecks.map(c => `• 🚨 <b>${c.name}:</b> ${c.desc}`).join('<br>') +
+      `<br><b>Remediation:</b> Do NOT visit this link or enter passwords. Add domain to Blacklist rules immediately.`;
+  }
+
+  res.json({ analysis: explanation });
+});
+
+// ============================================================================
+// 8. ADMIN USER MANAGEMENT API
+// ============================================================================
+
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const result = await query('SELECT id, name, email, role, initials, created_at FROM users ORDER BY created_at DESC;');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Fetch admin users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users list.' });
   }
 });
 

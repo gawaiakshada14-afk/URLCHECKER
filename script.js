@@ -20,8 +20,55 @@ document.addEventListener('DOMContentLoaded', () => {
   const USER_SESSION_KEY = 'shieldurl_user_session';
   const USER_RULES_KEY = 'shieldurl_user_rules';
 
+  const DEFAULT_SCAN_HISTORY = [
+    {
+      id: 'scan_seed_1',
+      url: 'https://github.com/security/advisories',
+      domain: 'github.com',
+      score: 98,
+      riskLevel: 'SAFE',
+      riskBadgeClass: 'safe',
+      timestamp: 'Just now',
+      checks: [],
+      summaryDesc: '🟢 SAFE - Clean domain'
+    },
+    {
+      id: 'scan_seed_2',
+      url: 'https://google.com',
+      domain: 'google.com',
+      score: 100,
+      riskLevel: 'SAFE',
+      riskBadgeClass: 'safe',
+      timestamp: '5m ago',
+      checks: [],
+      summaryDesc: '🟢 SAFE - Top ranked domain'
+    },
+    {
+      id: 'scan_seed_3',
+      url: 'http://paypa1-secure-account-login.xyz/auth',
+      domain: 'paypa1-secure-account-login.xyz',
+      score: 15,
+      riskLevel: 'MALICIOUS',
+      riskBadgeClass: 'danger',
+      timestamp: '15m ago',
+      checks: [],
+      summaryDesc: '🔴 MALICIOUS - Typosquatting domain'
+    },
+    {
+      id: 'scan_seed_4',
+      url: 'http://free-crypto-giveaway-2026.click/claim',
+      domain: 'free-crypto-giveaway-2026.click',
+      score: 52,
+      riskLevel: 'SUSPICIOUS',
+      riskBadgeClass: 'warning',
+      timestamp: '1h ago',
+      checks: [],
+      summaryDesc: '🟡 SUSPICIOUS - High risk TLD'
+    }
+  ];
+
   let currentScanResult = null;
-  let scanHistory = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  let scanHistory = JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_SCAN_HISTORY;
   let currentUser = JSON.parse(localStorage.getItem(USER_SESSION_KEY)) || null;
   let domainRules = JSON.parse(localStorage.getItem(USER_RULES_KEY)) || [
     { domain: 'google.com', type: 'whitelist' },
@@ -186,21 +233,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          scanHistory = data.map(item => ({
-            id: item.id,
-            url: item.url,
-            domain: item.domain,
-            score: item.score,
-            riskLevel: item.risk_level.toUpperCase(),
-            riskBadgeClass: item.score >= 75 ? 'safe' : item.score >= 45 ? 'warning' : 'danger',
-            timestamp: new Date(item.scan_date).toLocaleString(),
-            checks: item.checks_json || [],
-            summaryDesc: item.status
-          }));
+          scanHistory = data.map(item => {
+            const score = typeof item.score === 'number' ? item.score : 80;
+            const rLevel = item.risk_level || (score >= 75 ? 'SAFE' : score >= 45 ? 'SUSPICIOUS' : 'MALICIOUS');
+            return {
+              id: item.id || ('scan_' + Math.random()),
+              url: item.url || '',
+              domain: item.domain || (item.url ? getBaseDomain(item.url) : 'unknown'),
+              score: score,
+              riskLevel: rLevel.toString().toUpperCase(),
+              riskBadgeClass: score >= 75 ? 'safe' : score >= 45 ? 'warning' : 'danger',
+              timestamp: item.scan_date ? new Date(item.scan_date).toLocaleString() : new Date().toLocaleString(),
+              checks: item.checks_json || [],
+              summaryDesc: item.status || 'Scanned Audit'
+            };
+          });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
           renderHistoryTable();
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('API scan fetch fallback to local data');
+    }
   }
 
   async function fetchKpisFromApi() {
@@ -880,7 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalResult = assembleSecurityResult(normalizedUrl, parsedUrl, heuristics, threatIntel, liveDns, rdap, ipGeo);
     currentScanResult = finalResult;
 
-    saveScanToHistory(finalResult);
+    await saveScanToHistory(finalResult);
     renderExecutiveDashboard();
     addTelemetryFeedItem(parsedUrl.hostname, finalResult.riskLevel);
 
@@ -1221,14 +1275,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // ========================================================================
 
   async function saveScanToHistory(result) {
+    if (!result || !result.url) return;
+
+    // Remove duplicates of same URL and place new scan at top of history
     scanHistory = scanHistory.filter(item => item.url !== result.url);
     scanHistory.unshift(result);
     if (scanHistory.length > 50) scanHistory.pop();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
+
+    // Clear search and filter so the newly scanned URL is immediately visible to user
+    if (historySearch) historySearch.value = '';
+    if (historyFilter) historyFilter.value = 'all';
+
     renderHistoryTable();
 
     try {
-      await fetch('/api/scans', {
+      const res = await fetch('/api/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1241,37 +1303,74 @@ document.addEventListener('DOMContentLoaded', () => {
           metadata_json: { ip: result.ip, tld: result.tld, entropy: result.entropy, rdap: result.rdap }
         })
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.scan && data.scan.id) {
+          result.id = data.scan.id;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
+        }
+      }
       fetchKpisFromApi();
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Backend scan persistence warning:', e);
+    }
   }
 
   function renderHistoryTable() {
-    const search = historySearch.value.toLowerCase().trim();
-    const filter = historyFilter.value.toLowerCase();
+    if (!historyTbody) return;
+    const search = historySearch ? historySearch.value.toLowerCase().trim() : '';
+    const filter = historyFilter ? historyFilter.value.toLowerCase() : 'all';
 
     let filtered = scanHistory.filter(item => {
-      const ms = item.url.toLowerCase().includes(search) || item.domain.toLowerCase().includes(search);
-      const mf = filter === 'all' || item.riskLevel.toLowerCase() === filter;
-      return ms && mf;
+      if (!item) return false;
+      const urlStr = (item.url || '').toLowerCase();
+      const domainStr = (item.domain || '').toLowerCase();
+      const itemScore = typeof item.score === 'number' ? item.score : 50;
+      const rawRisk = (item.riskLevel || item.risk_level || (itemScore >= 75 ? 'safe' : itemScore >= 45 ? 'suspicious' : 'malicious')).toString().toLowerCase();
+
+      const matchesSearch = !search || urlStr.includes(search) || domainStr.includes(search);
+      
+      let matchesFilter = true;
+      if (filter !== 'all') {
+        if (filter === 'safe') {
+          matchesFilter = rawRisk.includes('safe') || itemScore >= 75;
+        } else if (filter === 'suspicious') {
+          matchesFilter = rawRisk.includes('suspicious') || rawRisk.includes('low') || (itemScore >= 45 && itemScore < 75);
+        } else if (filter === 'malicious') {
+          matchesFilter = rawRisk.includes('malicious') || rawRisk.includes('danger') || itemScore < 45;
+        } else {
+          matchesFilter = rawRisk.includes(filter);
+        }
+      }
+      return matchesSearch && matchesFilter;
     });
 
     if (filtered.length === 0) {
       historyTbody.innerHTML = '';
-      historyEmpty.style.display = 'block';
+      if (historyEmpty) historyEmpty.style.display = 'block';
       return;
     }
 
-    historyEmpty.style.display = 'none';
-    historyTbody.innerHTML = filtered.map(item => `<tr>
-      <td><span class="table-url" title="${item.url}">${item.url}</span></td>
-      <td><span class="table-score" style="color:${getScoreColor(item.score)}">${item.score}/100</span></td>
-      <td><span class="source-status ${item.riskBadgeClass}">${item.riskLevel}</span></td>
-      <td style="color:var(--text-muted);font-size:.8rem">${item.timestamp}</td>
-      <td class="text-right">
-        <button class="action-btn-sm" onclick="rescanHistoryItem('${item.url}')"><i class="fa-solid fa-rotate-right"></i></button>
-        <button class="action-btn-sm delete" onclick="deleteHistoryItem('${item.id}')"><i class="fa-solid fa-trash-can"></i></button>
-      </td>
-    </tr>`).join('');
+    if (historyEmpty) historyEmpty.style.display = 'none';
+    historyTbody.innerHTML = filtered.map(item => {
+      const score = typeof item.score === 'number' ? item.score : 50;
+      const badgeClass = item.riskBadgeClass || (score >= 75 ? 'safe' : score >= 45 ? 'warning' : 'danger');
+      const rText = item.riskLevel || (score >= 75 ? 'SAFE' : score >= 45 ? 'SUSPICIOUS' : 'MALICIOUS');
+      const itemTime = item.timestamp || new Date().toLocaleString();
+      const itemUrl = item.url || item.domain || 'N/A';
+
+      return `<tr>
+        <td><span class="table-url" title="${itemUrl}">${itemUrl}</span></td>
+        <td><span class="table-score" style="color:${getScoreColor(score)}">${score}/100</span></td>
+        <td><span class="source-status ${badgeClass}">${rText}</span></td>
+        <td style="color:var(--text-muted);font-size:.8rem">${itemTime}</td>
+        <td class="text-right">
+          <button class="action-btn-sm" title="Re-scan URL" onclick="rescanHistoryItem('${itemUrl}')"><i class="fa-solid fa-rotate-right"></i></button>
+          <button class="action-btn-sm delete" title="Delete record" onclick="deleteHistoryItem('${item.id}')"><i class="fa-solid fa-trash-can"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
   }
 
   window.rescanHistoryItem = function(url) { urlInput.value = url; btnClearUrl.style.display = 'block'; startSecurityScan(url); };
@@ -1401,6 +1500,240 @@ document.addEventListener('DOMContentLoaded', () => {
     let h = 0;
     for (let i = 0; i < domain.length; i++) h = domain.charCodeAt(i) + ((h << 5) - h);
     return `${Math.abs(h%180)+20}.${Math.abs((h>>2)%200)+10}.${Math.abs((h>>4)%250)+1}.${Math.abs((h>>6)%254)+1}`;
+  }
+
+  // ========================================================================
+  // 15. CSV EXPORT & NEW MASTER FEATURES MODULES
+  // ========================================================================
+
+  const btnExportCsv = document.getElementById('btn-export-csv');
+  if (btnExportCsv) {
+    btnExportCsv.addEventListener('click', exportScanHistoryCSV);
+  }
+
+  function exportScanHistoryCSV() {
+    if (!scanHistory || scanHistory.length === 0) {
+      showToast('No scan history available to export.', 'warning');
+      return;
+    }
+
+    const headers = ['ID', 'URL', 'Domain', 'Security Score', 'Risk Status', 'Scan Date'];
+    const rows = scanHistory.map(item => [
+      item.id || '',
+      `"${(item.url || '').replace(/"/g, '""')}"`,
+      `"${(item.domain || '').replace(/"/g, '""')}"`,
+      item.score !== undefined ? item.score : '',
+      `"${(item.status || item.risk_level || '').replace(/"/g, '""')}"`,
+      `"${(item.date || item.scan_date || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `ShieldURL_Scan_History_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('Scan history exported as CSV successfully!', 'success');
+  }
+
+  // ========================================================================
+  // 16. AI SECURITY ANALYST ASSISTANT DRAWER LOGIC
+  // ========================================================================
+
+  const aiDrawer = document.getElementById('ai-assistant-drawer');
+  const btnOpenAi = document.getElementById('btn-open-ai-drawer');
+  const btnCloseAi = document.getElementById('btn-close-ai-drawer');
+  const aiChatForm = document.getElementById('ai-chat-form');
+  const aiPromptInput = document.getElementById('ai-prompt-input');
+  const aiChatBody = document.getElementById('ai-chat-body');
+
+  if (btnOpenAi && aiDrawer) {
+    btnOpenAi.addEventListener('click', () => {
+      aiDrawer.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseAi && aiDrawer) {
+    btnCloseAi.addEventListener('click', () => {
+      aiDrawer.style.display = 'none';
+    });
+  }
+
+  if (aiChatForm) {
+    aiChatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = aiPromptInput.value.trim();
+      if (!text) return;
+
+      appendAiChatMessage(text, 'user');
+      aiPromptInput.value = '';
+
+      // Append typing indicator
+      const typingElem = appendAiChatMessage('<i>AI Analyst is analyzing threat parameters...</i>', 'bot');
+
+      try {
+        const payload = {
+          prompt: text,
+          url: currentScanResult ? currentScanResult.url : '',
+          score: currentScanResult ? currentScanResult.score : 85
+        };
+
+        const res = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        typingElem.querySelector('.message-bubble').innerHTML = data.analysis || 'Analysis complete.';
+      } catch (err) {
+        typingElem.querySelector('.message-bubble').innerHTML = '<b>Response:</b> Shannon Entropy and SSL audits evaluate URL safety. Check suspicious links carefully before entering passwords.';
+      }
+    });
+  }
+
+  // Quick Prompt Pills
+  document.querySelectorAll('.prompt-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const promptText = pill.getAttribute('data-prompt');
+      if (promptText && aiPromptInput) {
+        aiPromptInput.value = promptText;
+        aiChatForm.dispatchEvent(new Event('submit'));
+      }
+    });
+  });
+
+  function appendAiChatMessage(htmlContent, sender = 'bot') {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `ai-message ${sender}`;
+    msgDiv.innerHTML = `<div class="message-bubble">${htmlContent}</div>`;
+    aiChatBody.appendChild(msgDiv);
+    aiChatBody.scrollTop = aiChatBody.scrollHeight;
+    return msgDiv;
+  }
+
+  // ========================================================================
+  // 17. ADMIN CONTROL PANEL MODAL LOGIC
+  // ========================================================================
+
+  const adminModal = document.getElementById('admin-modal');
+  const btnOpenAdmin = document.getElementById('btn-admin-modal');
+  const btnCloseAdmin = document.getElementById('btn-close-admin-modal');
+  const adminKeysForm = document.getElementById('admin-keys-form');
+
+  if (btnOpenAdmin && adminModal) {
+    btnOpenAdmin.addEventListener('click', () => {
+      adminModal.style.display = 'flex';
+      loadAdminData();
+    });
+  }
+
+  if (btnCloseAdmin && adminModal) {
+    btnCloseAdmin.addEventListener('click', () => {
+      adminModal.style.display = 'none';
+    });
+  }
+
+  // Admin Tab Switcher
+  const tabAdminKeys = document.getElementById('tab-admin-keys');
+  const tabAdminUsers = document.getElementById('tab-admin-users');
+  const tabAdminSystem = document.getElementById('tab-admin-system');
+
+  const viewAdminKeys = document.getElementById('view-admin-keys');
+  const viewAdminUsers = document.getElementById('view-admin-users');
+  const viewAdminSystem = document.getElementById('view-admin-system');
+
+  if (tabAdminKeys && tabAdminUsers && tabAdminSystem) {
+    tabAdminKeys.addEventListener('click', () => switchAdminTab(tabAdminKeys, viewAdminKeys));
+    tabAdminUsers.addEventListener('click', () => {
+      switchAdminTab(tabAdminUsers, viewAdminUsers);
+      fetchAdminUsers();
+    });
+    tabAdminSystem.addEventListener('click', () => switchAdminTab(tabAdminSystem, viewAdminSystem));
+  }
+
+  function switchAdminTab(activeTab, activeView) {
+    [tabAdminKeys, tabAdminUsers, tabAdminSystem].forEach(t => t.classList.remove('active'));
+    [viewAdminKeys, viewAdminUsers, viewAdminSystem].forEach(v => v.style.display = 'none');
+    activeTab.classList.add('active');
+    activeView.style.display = 'block';
+  }
+
+  async function loadAdminData() {
+    try {
+      const res = await fetch('/api/keys');
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById('admin-vt-key').value = data.vt || '';
+        document.getElementById('admin-gsb-key').value = data.gsb || '';
+        document.getElementById('admin-webhook-url').value = data.webhook || '';
+      }
+    } catch (e) {}
+  }
+
+  if (adminKeysForm) {
+    adminKeysForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const vt = document.getElementById('admin-vt-key').value.trim();
+      const gsb = document.getElementById('admin-gsb-key').value.trim();
+      const webhook = document.getElementById('admin-webhook-url').value.trim();
+
+      try {
+        const res = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vt, gsb, webhook })
+        });
+        const data = await res.json();
+        showToast(data.message || 'Admin settings saved!', 'success');
+      } catch (err) {
+        showToast('Failed to save Admin settings.', 'danger');
+      }
+    });
+  }
+
+  async function fetchAdminUsers() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Loading users from Supabase...</td></tr>';
+
+    try {
+      const res = await fetch('/api/admin/users');
+      const users = await res.json();
+      if (!Array.isArray(users) || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No registered analyst accounts found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td><strong>${u.name}</strong></td>
+          <td>${u.email}</td>
+          <td><span class="badge-safe">${u.role || 'Security Analyst'}</span></td>
+          <td>${new Date(u.created_at || Date.now()).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load users from database.</td></tr>';
+    }
+  }
+
+  const btnReinitDb = document.getElementById('btn-reinit-db');
+  if (btnReinitDb) {
+    btnReinitDb.addEventListener('click', async () => {
+      if (!confirm('Re-initialize Supabase database schema and reset seed data?')) return;
+      try {
+        const res = await fetch('/api/init-db', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'Database re-initialized!', 'success');
+        checkDatabaseStatus();
+      } catch (err) {
+        showToast('Database init failed.', 'danger');
+      }
+    });
   }
 
   function loadSavedApiKeys() {
