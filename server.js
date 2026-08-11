@@ -520,15 +520,24 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-// Serve index.html for root path fallback
+// Serve index.html for root path fallback (for non-API GET requests)
 app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log('================================================================');
-  console.log(`🛡️ ShieldURL Security Server live on http://localhost:${PORT}`);
-  console.log(`🗄️ Database Connected: Supabase PostgreSQL`);
-  console.log('================================================================');
-});
+// Export app for serverless function platforms (Vercel)
+module.exports = app;
+
+// Start Express Server locally
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log('================================================================');
+    console.log(`🛡️ ShieldURL Security Server live on http://localhost:${PORT}`);
+    console.log(`🗄️ Database Connected: Supabase PostgreSQL`);
+    console.log('================================================================');
+  });
+}
+
