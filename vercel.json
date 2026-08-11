@@ -1,9 +1,34 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "*.css,*.js,*.html,assets/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/style.css",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css"
+        }
+      ]
+    },
+    {
+      "source": "/script.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
     }
   ]
 }

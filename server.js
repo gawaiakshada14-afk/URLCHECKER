@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 require('dotenv').config();
 
@@ -520,12 +521,46 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
+// Explicit routes for key static assets to ensure correct MIME types on Vercel
+app.get('/style.css', (req, res) => {
+  const cssPath = path.join(__dirname, 'style.css');
+  if (fs.existsSync(cssPath)) {
+    res.setHeader('Content-Type', 'text/css');
+    return res.sendFile(cssPath);
+  }
+  res.status(404).type('text/plain').send('File not found: style.css');
+});
+
+app.get('/script.js', (req, res) => {
+  const jsPath = path.join(__dirname, 'script.js');
+  if (fs.existsSync(jsPath)) {
+    res.setHeader('Content-Type', 'application/javascript');
+    return res.sendFile(jsPath);
+  }
+  res.status(404).type('text/plain').send('File not found: script.js');
+});
+
 // Serve index.html for root path fallback (for non-API GET requests)
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
-  res.sendFile(path.join(__dirname, 'index.html'));
+
+  // If request has a file extension (e.g., .css, .js, .png, .jpg, .ico, .svg, .json), do NOT fallback to index.html
+  const ext = path.extname(req.path);
+  if (ext) {
+    const filePath = path.join(__dirname, req.path);
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+    return res.status(404).type('text/plain').send(`File not found: ${req.path}`);
+  }
+
+  const indexPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.status(404).type('text/plain').send('index.html not found');
 });
 
 // Export app for serverless function platforms (Vercel)
