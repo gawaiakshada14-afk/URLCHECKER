@@ -551,6 +551,9 @@ app.get('*', (req, res) => {
   if (ext) {
     const filePath = path.join(__dirname, req.path);
     if (fs.existsSync(filePath)) {
+      if (ext === '.svg') {
+        res.setHeader('Content-Type', 'image/svg+xml');
+      }
       return res.sendFile(filePath);
     }
     return res.status(404).type('text/plain').send(`File not found: ${req.path}`);

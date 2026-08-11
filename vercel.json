@@ -2,7 +2,12 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "includeFiles": "*.css,*.js,*.html,assets/**"
+      "includeFiles": [
+        "style.css",
+        "script.js",
+        "index.html",
+        "assets/**"
+      ]
     }
   },
   "rewrites": [
@@ -27,6 +32,15 @@
         {
           "key": "Content-Type",
           "value": "application/javascript"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*).svg",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/svg+xml"
         }
       ]
     }
