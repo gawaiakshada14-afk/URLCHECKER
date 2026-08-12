@@ -681,8 +681,8 @@ ul {
 
 .hero-container {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 3rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
   align-items: center;
 }
 
@@ -791,11 +791,19 @@ ul {
   background: var(--border-color);
 }
 
+.hero-image-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 .hero-illustration {
   width: 100%;
-  max-width: 520px;
+  max-width: 680px;
   height: auto;
-  filter: drop-shadow(0 20px 30px rgba(37, 99, 235, 0.1));
+  filter: drop-shadow(0 20px 30px rgba(37, 99, 235, 0.15));
+  transition: transform var(--transition-normal);
 }
 
 /* --------------------------------------------------------------------------
