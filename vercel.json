@@ -31,7 +31,7 @@
       ]
     },
     {
-      "source": "/assets/(.*).svg",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Content-Type",

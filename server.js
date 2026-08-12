@@ -540,6 +540,34 @@ app.get('/script.js', (req, res) => {
   res.status(404).type('text/plain').send('File not found: script.js');
 });
 
+// Explicit routes for SVG image assets
+app.get(['/assets/images/hero.svg', '/hero.svg'], (req, res) => {
+  const file = path.join(__dirname, 'assets', 'images', 'hero.svg');
+  if (fs.existsSync(file)) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    return res.sendFile(file);
+  }
+  res.status(404).type('text/plain').send('File not found: hero.svg');
+});
+
+app.get(['/assets/images/security.svg', '/security.svg'], (req, res) => {
+  const file = path.join(__dirname, 'assets', 'images', 'security.svg');
+  if (fs.existsSync(file)) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    return res.sendFile(file);
+  }
+  res.status(404).type('text/plain').send('File not found: security.svg');
+});
+
+app.get(['/assets/images/dashboard.svg', '/dashboard.svg'], (req, res) => {
+  const file = path.join(__dirname, 'assets', 'images', 'dashboard.svg');
+  if (fs.existsSync(file)) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    return res.sendFile(file);
+  }
+  res.status(404).type('text/plain').send('File not found: dashboard.svg');
+});
+
 // Serve index.html for root path fallback (for non-API GET requests)
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
