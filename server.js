@@ -57,10 +57,15 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin) ||
+      (process.env.VERCEL_URL && origin === `https://${process.env.VERCEL_URL}`)
+    ) {
       return callback(null, true);
     }
-    return callback(new Error('CORS policy violation: Origin not allowed.'));
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
