@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return res;
   }
 
-  // Cleanup legacy browser scan history keys
+  // Cleanup legacy shared browser scan history keys
   try {
     localStorage.removeItem('shieldurl_scan_history');
     localStorage.removeItem('scanHistory');
@@ -71,6 +71,36 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentScanResult = null;
   let scanHistory = [];
   let currentUser = JSON.parse(localStorage.getItem(USER_SESSION_KEY)) || null;
+
+  function getUserHistoryStorageKey() {
+    if (!currentUser) return null;
+    const uid = currentUser.id || currentUser.email || 'user';
+    return `shieldurl_scan_history_${uid}`;
+  }
+
+  function loadUserScanHistory() {
+    const key = getUserHistoryStorageKey();
+    if (!key) {
+      scanHistory = [];
+      renderHistoryTable();
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(key);
+      scanHistory = stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      scanHistory = [];
+    }
+    renderHistoryTable();
+  }
+
+  function saveUserScanHistory() {
+    const key = getUserHistoryStorageKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(scanHistory));
+    } catch (e) {}
+  }
   let domainRules = JSON.parse(localStorage.getItem(USER_RULES_KEY)) || [
     { domain: 'google.com', type: 'whitelist' },
     { domain: 'phishing-login-fake.net', type: 'blacklist' }
@@ -229,9 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchScansFromApi() {
-    // Session-only Scan History requirement: Every login starts with empty history []
-    scanHistory = [];
-    renderHistoryTable();
+    loadUserScanHistory();
   }
 
   async function fetchKpisFromApi() {
@@ -382,10 +410,6 @@ document.addEventListener('DOMContentLoaded', () => {
     currentUser = null;
     setAuthToken(null);
     localStorage.removeItem(USER_SESSION_KEY);
-    try {
-      localStorage.removeItem('shieldurl_scan_history');
-      localStorage.removeItem('scanHistory');
-    } catch (e) {}
     scanHistory = [];
     renderHistoryTable();
     updateUserSessionUI();
@@ -395,12 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function setUserSession(userObj) {
     currentUser = userObj;
     localStorage.setItem(USER_SESSION_KEY, JSON.stringify(userObj));
-    try {
-      localStorage.removeItem('shieldurl_scan_history');
-      localStorage.removeItem('scanHistory');
-    } catch (e) {}
-    scanHistory = [];
-    renderHistoryTable();
+    loadUserScanHistory();
     updateUserSessionUI();
   }
 
@@ -729,42 +748,22 @@ document.addEventListener('DOMContentLoaded', () => {
    * Queries REAL VirusTotal API v3 when key is provided
    */
   async function fetchVirusTotal(domain, apiKey) {
-    if (!apiKey) {
-      return { configured: false, status: 'No API Key', badge: 'badge-warning', desc: 'Add a free VirusTotal API key in Settings for live 90+ engine queries.' };
+    try {
+      const res = await authFetch('/api/scan/threat-intel', {
+        method: 'POST',
+        body: JSON.stringify({ domain, vtKey: apiKey })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.vt) {
+          return data.vt;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend VirusTotal proxy fetch failed:', e);
     }
 
-    try {
-      const res = await fetch(`https://www.virustotal.com/api/v3/domains/${encodeURIComponent(domain)}`, {
-        headers: { 'x-apikey': apiKey }
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        const stats = json.data && json.data.attributes && json.data.attributes.last_analysis_stats;
-        if (stats) {
-          const malicious = stats.malicious || 0;
-          const suspicious = stats.suspicious || 0;
-          const total = (stats.harmless || 0) + (stats.undetected || 0) + malicious + suspicious;
-          const flagged = malicious + suspicious;
-
-          return {
-            configured: true,
-            found: true,
-            flagged,
-            total,
-            status: flagged > 0 ? `${flagged} / ${total} Engine Flags` : `0 / ${total} Engine Flags`,
-            badge: flagged > 0 ? 'badge-danger' : 'badge-safe',
-            desc: flagged > 0 
-              ? `WARNING: ${flagged} out of ${total} security vendors flagged this domain as malicious/suspicious on VirusTotal.`
-              : `Verified clean across ${total} antivirus and threat intelligence engines on VirusTotal.`
-          };
-        }
-      } else if (res.status === 401 || res.status === 403) {
-        return { configured: true, found: false, status: 'Invalid Key (401)', badge: 'badge-danger', desc: 'VirusTotal API key was rejected. Please check your key in Settings.' };
-      }
-    } catch (e) { console.warn('VirusTotal fetch failed:', e); }
-
-    return { configured: true, found: false, status: 'Query Error', badge: 'badge-warning', desc: 'Could not reach VirusTotal API endpoint (Network/CORS error).' };
+    return { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Could not reach VirusTotal API endpoint.' };
   }
 
   /**
@@ -1282,7 +1281,6 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveScanToHistory(result) {
     if (!result || !result.url) return;
 
-    // Session-only history: prepend new scan to in-memory scanHistory array
     scanHistory = scanHistory.filter(item => item.url !== result.url);
     scanHistory.unshift(result);
     if (scanHistory.length > 50) scanHistory.pop();
@@ -1290,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (historySearch) historySearch.value = '';
     if (historyFilter) historyFilter.value = 'all';
 
+    saveUserScanHistory();
     renderHistoryTable();
 
     try {
@@ -1376,22 +1375,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.rescanHistoryItem = function(url) { urlInput.value = url; btnClearUrl.style.display = 'block'; startSecurityScan(url); };
   window.deleteHistoryItem = function(id) {
-    // Session-only: remove item from in-memory scanHistory without modifying database
     scanHistory = scanHistory.filter(i => i.id !== id);
+    saveUserScanHistory();
     renderHistoryTable();
-    showToast('Record deleted from active session.', 'info');
+    showToast('Record deleted.', 'info');
   };
 
   function clearAllHistory() {
     if (scanHistory.length === 0) return;
-    if (confirm('Clear current session scan history?')) {
+    if (confirm('Clear scan history for your account?')) {
       scanHistory = [];
-      try {
-        localStorage.removeItem('shieldurl_scan_history');
-        localStorage.removeItem('scanHistory');
-      } catch (e) {}
+      const key = getUserHistoryStorageKey();
+      if (key) {
+        try { localStorage.removeItem(key); } catch (e) {}
+      }
       renderHistoryTable();
-      showToast('Session scan history cleared.', 'success');
+      showToast('Account scan history cleared.', 'success');
     }
   }
 

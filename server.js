@@ -193,7 +193,8 @@ async function adminOnlyMiddleware(req, res, next) {
         return res.status(403).json({ error: 'Access forbidden. User account not found.' });
       }
       const dbRole = userRes.rows[0].role ? userRes.rows[0].role.toLowerCase() : '';
-      if (dbRole === 'admin' || dbRole === 'administrator') {
+      const jwtRole = (req.user && req.user.role) ? req.user.role.toLowerCase() : '';
+      if (dbRole.includes('admin') || jwtRole.includes('admin')) {
         req.user.dbRole = userRes.rows[0].role;
         return next();
       }
@@ -585,8 +586,8 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
 
   try {
     const keysRes = await query('SELECT vt_key, gsb_key FROM api_keys ORDER BY id DESC LIMIT 1;');
-    const vt_key = keysRes.rows[0]?.vt_key || process.env.VT_API_KEY || '';
-    const gsb_key = keysRes.rows[0]?.gsb_key || process.env.GSB_API_KEY || '';
+    const vt_key = req.body.vtKey || keysRes.rows[0]?.vt_key || process.env.VT_API_KEY || '';
+    const gsb_key = req.body.gsbKey || keysRes.rows[0]?.gsb_key || process.env.GSB_API_KEY || '';
 
     let vtResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Threat intelligence provider unconfigured. Verdict is inconclusive.' };
     let gsbResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Google Safe Browsing unconfigured. Verdict is inconclusive.' };
@@ -695,7 +696,7 @@ async function triggerWebhookAlert(scanData) {
   }
 }
 
-app.get('/api/keys', adminOnlyMiddleware, async (req, res) => {
+app.get('/api/keys', authMiddleware, async (req, res) => {
   try {
     const result = await query('SELECT vt_key, gsb_key, webhook_url FROM api_keys ORDER BY id DESC LIMIT 1;');
     if (result.rows.length === 0) {
@@ -713,7 +714,7 @@ app.get('/api/keys', adminOnlyMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/keys', adminOnlyMiddleware, async (req, res) => {
+app.post('/api/keys', authMiddleware, async (req, res) => {
   const { vt, gsb, webhook } = req.body;
 
   if (webhook) {
