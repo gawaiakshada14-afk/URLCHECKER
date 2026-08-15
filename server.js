@@ -586,8 +586,8 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
 
   try {
     const keysRes = await query('SELECT vt_key, gsb_key FROM api_keys ORDER BY id DESC LIMIT 1;');
-    const vt_key = req.body.vtKey || keysRes.rows[0]?.vt_key || process.env.VT_API_KEY || '';
-    const gsb_key = req.body.gsbKey || keysRes.rows[0]?.gsb_key || process.env.GSB_API_KEY || '';
+    const vt_key = process.env.API_KEY || req.body.vtKey || keysRes.rows[0]?.vt_key || process.env.VT_API_KEY || '';
+    const gsb_key = process.env.GOOGLE_BROWSING_KEY || req.body.gsbKey || keysRes.rows[0]?.gsb_key || process.env.GSB_API_KEY || '';
 
     let vtResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Threat intelligence provider unconfigured. Verdict is inconclusive.' };
     let gsbResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Google Safe Browsing unconfigured. Verdict is inconclusive.' };
@@ -704,8 +704,8 @@ app.get('/api/keys', authMiddleware, async (req, res) => {
     }
     const row = result.rows[0];
     res.json({
-      vtConfigured: Boolean(row.vt_key),
-      gsbConfigured: Boolean(row.gsb_key),
+      vtConfigured: Boolean(process.env.API_KEY || row.vt_key),
+      gsbConfigured: Boolean(process.env.GOOGLE_BROWSING_KEY || row.gsb_key),
       webhookConfigured: Boolean(row.webhook_url),
       webhookMasked: row.webhook_url ? (row.webhook_url.substring(0, 15) + '••••••••') : ''
     });
