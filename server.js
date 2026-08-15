@@ -700,12 +700,17 @@ app.get('/api/keys', authMiddleware, async (req, res) => {
   try {
     const result = await query('SELECT vt_key, gsb_key, webhook_url FROM api_keys ORDER BY id DESC LIMIT 1;');
     if (result.rows.length === 0) {
-      return res.json({ vtConfigured: false, gsbConfigured: false, webhookConfigured: false, webhookMasked: '' });
+      return res.json({
+        vtConfigured: Boolean(process.env.VT_API_KEY),
+        gsbConfigured: Boolean(process.env.GSB_API_KEY),
+        webhookConfigured: false,
+        webhookMasked: ''
+      });
     }
     const row = result.rows[0];
     res.json({
-      vtConfigured: Boolean(process.env.API_KEY || row.vt_key),
-      gsbConfigured: Boolean(process.env.GOOGLE_BROWSING_KEY || row.gsb_key),
+      vtConfigured: Boolean(process.env.VT_API_KEY || row.vt_key),
+      gsbConfigured: Boolean(process.env.GSB_API_KEY || row.gsb_key),
       webhookConfigured: Boolean(row.webhook_url),
       webhookMasked: row.webhook_url ? (row.webhook_url.substring(0, 15) + '••••••••') : ''
     });
@@ -725,10 +730,17 @@ app.post('/api/keys', authMiddleware, async (req, res) => {
   }
 
   try {
+    const existing = await query('SELECT vt_key, gsb_key, webhook_url FROM api_keys ORDER BY id DESC LIMIT 1;');
+    const oldRow = existing.rows[0] || {};
+
+    const finalVt = (vt && vt.trim() !== '') ? vt.trim() : (oldRow.vt_key || '');
+    const finalGsb = (gsb && gsb.trim() !== '') ? gsb.trim() : (oldRow.gsb_key || '');
+    const finalWebhook = (webhook !== undefined) ? webhook : (oldRow.webhook_url || '');
+
     await query('DELETE FROM api_keys;');
     await query(
       'INSERT INTO api_keys (user_id, vt_key, gsb_key, webhook_url) VALUES ($1, $2, $3, $4);',
-      [req.user.id, vt || '', gsb || '', webhook || '']
+      [req.user.id, finalVt, finalGsb, finalWebhook]
     );
     res.json({ message: 'API Keys and Webhook URL saved successfully.' });
   } catch (err) {

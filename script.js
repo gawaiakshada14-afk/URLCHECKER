@@ -549,6 +549,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         showToast('Threat Intelligence API Keys saved!', 'success');
         updateApiKeyStatusHints(Boolean(vtKey), Boolean(gsbKey));
+        vtApiKeyInput.value = '';
+        gsbApiKeyInput.value = '';
       } else {
         showToast(data.error || 'Failed to save API keys.', 'danger');
       }
@@ -1732,12 +1734,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function loadSavedApiKeys() {
+  async function loadSavedApiKeys() {
     try {
-      const k = JSON.parse(localStorage.getItem(API_KEY_STORAGE) || '{}');
-      if (k.vt) vtApiKeyInput.value = k.vt;
-      if (k.gsb) gsbApiKeyInput.value = k.gsb;
-      updateApiKeyStatusHints(k.vt, k.gsb);
+      const res = await authFetch('/api/keys');
+      if (res.ok) {
+        const data = await res.json();
+        updateApiKeyStatusHints(data.vtConfigured, data.gsbConfigured);
+      }
     } catch (e) {}
   }
 
