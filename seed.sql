@@ -3,9 +3,10 @@
 -- Database Initial Seeding Script
 -- ============================================================================
 
--- Insert Default Analyst Users
+-- Insert Default Analyst Users & Admin
 INSERT INTO users (name, email, password_hash, role, initials) VALUES
-('Alex Security Analyst', 'analyst@shieldurl.io', '$2a$10$wT0lQ.pL8f/c9G6W5k9Uae.w.m4.w6k6/6Q3w5e6.w6k6/6Q3w5e6', 'Senior Cybersec Specialist', 'AS'),
+('System Administrator', 'admin@shieldurl.io', '$2a$10$wT0lQ.pL8f/c9G6W5k9Uae.w.m4.w6k6/6Q3w5e6.w6k6/6Q3w5e6', 'Admin', 'SA'),
+('Alex Security Analyst', 'analyst@shieldurl.io', '$2a$10$wT0lQ.pL8f/c9G6W5k9Uae.w.m4.w6k6/6Q3w5e6.w6k6/6Q3w5e6', 'Security Analyst', 'AS'),
 ('Sarah Jenkins', 's.jenkins@cyberdefense.org', '$2a$10$wT0lQ.pL8f/c9G6W5k9Uae.w.m4.w6k6/6Q3w5e6.w6k6/6Q3w5e6', 'Lead Threat Analyst', 'SJ'),
 ('Demo User', 'demo@shieldurl.io', '$2a$10$wT0lQ.pL8f/c9G6W5k9Uae.w.m4.w6k6/6Q3w5e6.w6k6/6Q3w5e6', 'Security Analyst', 'DU');
 

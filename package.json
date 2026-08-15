@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "seed": "node seed.js",
-    "test:api": "node test-apis.js"
+    "test:api": "node test-apis.js",
+    "secret-scan": "node secret-scan.js"
   },
   "keywords": [
     "url-checker",

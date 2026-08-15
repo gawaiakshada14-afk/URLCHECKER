@@ -19,56 +19,57 @@ document.addEventListener('DOMContentLoaded', () => {
   const API_KEY_STORAGE = 'shieldurl_api_keys';
   const USER_SESSION_KEY = 'shieldurl_user_session';
   const USER_RULES_KEY = 'shieldurl_user_rules';
+  const TOKEN_KEY = 'shieldurl_jwt_token';
 
-  const DEFAULT_SCAN_HISTORY = [
-    {
-      id: 'scan_seed_1',
-      url: 'https://github.com/security/advisories',
-      domain: 'github.com',
-      score: 98,
-      riskLevel: 'SAFE',
-      riskBadgeClass: 'safe',
-      timestamp: 'Just now',
-      checks: [],
-      summaryDesc: '🟢 SAFE - Clean domain'
-    },
-    {
-      id: 'scan_seed_2',
-      url: 'https://google.com',
-      domain: 'google.com',
-      score: 100,
-      riskLevel: 'SAFE',
-      riskBadgeClass: 'safe',
-      timestamp: '5m ago',
-      checks: [],
-      summaryDesc: '🟢 SAFE - Top ranked domain'
-    },
-    {
-      id: 'scan_seed_3',
-      url: 'http://paypa1-secure-account-login.xyz/auth',
-      domain: 'paypa1-secure-account-login.xyz',
-      score: 15,
-      riskLevel: 'MALICIOUS',
-      riskBadgeClass: 'danger',
-      timestamp: '15m ago',
-      checks: [],
-      summaryDesc: '🔴 MALICIOUS - Typosquatting domain'
-    },
-    {
-      id: 'scan_seed_4',
-      url: 'http://free-crypto-giveaway-2026.click/claim',
-      domain: 'free-crypto-giveaway-2026.click',
-      score: 52,
-      riskLevel: 'SUSPICIOUS',
-      riskBadgeClass: 'warning',
-      timestamp: '1h ago',
-      checks: [],
-      summaryDesc: '🟡 SUSPICIOUS - High risk TLD'
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function getAuthToken() {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  }
+
+  function setAuthToken(token) {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
     }
-  ];
+  }
+
+  async function authFetch(url, options = {}) {
+    const token = getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 && !url.includes('/api/auth/')) {
+      setAuthToken(null);
+      currentUser = null;
+      localStorage.removeItem(USER_SESSION_KEY);
+      updateUserSessionUI();
+    }
+    return res;
+  }
+
+  // Cleanup legacy browser scan history keys
+  try {
+    localStorage.removeItem('shieldurl_scan_history');
+    localStorage.removeItem('scanHistory');
+  } catch (e) {}
 
   let currentScanResult = null;
-  let scanHistory = JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_SCAN_HISTORY;
+  let scanHistory = [];
   let currentUser = JSON.parse(localStorage.getItem(USER_SESSION_KEY)) || null;
   let domainRules = JSON.parse(localStorage.getItem(USER_RULES_KEY)) || [
     { domain: 'google.com', type: 'whitelist' },
@@ -216,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchRulesFromApi() {
     try {
-      const res = await fetch('/api/rules');
+      const res = await authFetch('/api/rules');
       if (res.ok) {
         const rules = await res.json();
         if (Array.isArray(rules) && rules.length > 0) {
@@ -228,38 +229,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchScansFromApi() {
-    try {
-      const res = await fetch('/api/scans');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          scanHistory = data.map(item => {
-            const score = typeof item.score === 'number' ? item.score : 80;
-            const rLevel = item.risk_level || (score >= 75 ? 'SAFE' : score >= 45 ? 'SUSPICIOUS' : 'MALICIOUS');
-            return {
-              id: item.id || ('scan_' + Math.random()),
-              url: item.url || '',
-              domain: item.domain || (item.url ? getBaseDomain(item.url) : 'unknown'),
-              score: score,
-              riskLevel: rLevel.toString().toUpperCase(),
-              riskBadgeClass: score >= 75 ? 'safe' : score >= 45 ? 'warning' : 'danger',
-              timestamp: item.scan_date ? new Date(item.scan_date).toLocaleString() : new Date().toLocaleString(),
-              checks: item.checks_json || [],
-              summaryDesc: item.status || 'Scanned Audit'
-            };
-          });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
-          renderHistoryTable();
-        }
-      }
-    } catch (e) {
-      console.warn('API scan fetch fallback to local data');
-    }
+    // Session-only Scan History requirement: Every login starts with empty history []
+    scanHistory = [];
+    renderHistoryTable();
   }
 
   async function fetchKpisFromApi() {
     try {
-      const res = await fetch('/api/kpis');
+      const res = await authFetch('/api/kpis');
       if (res.ok) {
         const data = await res.json();
         kpiTotalScans.textContent = data.totalScans;
@@ -285,12 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchApiKeysFromApi() {
     try {
-      const res = await fetch('/api/keys');
+      const res = await authFetch('/api/keys');
       if (res.ok) {
         const keys = await res.json();
-        if (keys.vt) vtApiKeyInput.value = keys.vt;
-        if (keys.gsb) gsbApiKeyInput.value = keys.gsb;
-        updateApiKeyStatusHints(keys.vt, keys.gsb);
+        updateApiKeyStatusHints(keys.vtConfigured, keys.gsbConfigured);
       }
     } catch (e) {}
   }
@@ -321,47 +296,60 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       if (res.ok) {
         const data = await res.json();
+        setAuthToken(data.token);
         setUserSession(data.user);
         authModal.style.display = 'none';
-        showToast('Logged in as Demo Analyst via Supabase!', 'success');
+        showToast('Logged in as Demo Analyst!', 'success');
+        checkDbHealth();
         return;
       }
     } catch (e) {}
-    setUserSession({ name: 'Alex Security Analyst', email: 'analyst@shieldurl.io', role: 'Senior Cybersec Specialist', initials: 'AS' });
-    authModal.style.display = 'none';
-    showToast('Logged in as Demo Analyst!', 'success');
+    showToast('Failed to log in as Demo Analyst.', 'danger');
   });
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password')?.value || 'password123';
+    const password = document.getElementById('login-password')?.value || '';
+    if (!email || !password) {
+      showToast('Please enter both email and password.', 'warning');
+      return;
+    }
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
+        setAuthToken(data.token);
         setUserSession(data.user);
         authModal.style.display = 'none';
         showToast(data.message || `Welcome back!`, 'success');
-        return;
+        checkDbHealth();
+      } else {
+        showToast(data.error || 'Authentication failed.', 'danger');
       }
-    } catch (err) {}
-    const name = email.split('@')[0].replace(/[._]/g, ' ');
-    const initials = name.substring(0, 2).toUpperCase();
-    setUserSession({ name: capitalize(name), email, role: 'Security Analyst', initials });
-    authModal.style.display = 'none';
-    showToast(`Welcome back, ${capitalize(name)}!`, 'success');
+    } catch (err) {
+      showToast('Authentication network error.', 'danger');
+    }
   });
 
   signupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
-    const password = document.getElementById('signup-password')?.value || 'password123';
+    const password = document.getElementById('signup-password')?.value || '';
+
+    if (!name || !email || !password) {
+      showToast('Please fill in all fields.', 'warning');
+      return;
+    }
+    if (password.length < 8) {
+      showToast('Password must be at least 8 characters long.', 'warning');
+      return;
+    }
 
     try {
       const res = await fetch('/api/auth/signup', {
@@ -369,19 +357,19 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
+        setAuthToken(data.token);
         setUserSession(data.user);
         authModal.style.display = 'none';
-        showToast(`Account created in Supabase! Welcome, ${name}.`, 'success');
-        return;
+        showToast(`Account created! Welcome, ${name}.`, 'success');
+        checkDbHealth();
+      } else {
+        showToast(data.error || 'Account creation failed.', 'danger');
       }
-    } catch (err) {}
-
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-    setUserSession({ name, email, role: 'Lead Analyst', initials: initials || 'US' });
-    authModal.style.display = 'none';
-    showToast(`Account created! Welcome, ${name}.`, 'success');
+    } catch (err) {
+      showToast('Signup network error.', 'danger');
+    }
   });
 
   btnUserDropdown.addEventListener('click', (e) => {
@@ -391,13 +379,28 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', () => { if (userDropdownContent) userDropdownContent.style.display = 'none'; });
 
   btnLogout.addEventListener('click', () => {
-    currentUser = null; localStorage.removeItem(USER_SESSION_KEY);
-    updateUserSessionUI(); showToast('Signed out successfully.', 'info');
+    currentUser = null;
+    setAuthToken(null);
+    localStorage.removeItem(USER_SESSION_KEY);
+    try {
+      localStorage.removeItem('shieldurl_scan_history');
+      localStorage.removeItem('scanHistory');
+    } catch (e) {}
+    scanHistory = [];
+    renderHistoryTable();
+    updateUserSessionUI();
+    showToast('Signed out successfully.', 'info');
   });
 
   function setUserSession(userObj) {
     currentUser = userObj;
     localStorage.setItem(USER_SESSION_KEY, JSON.stringify(userObj));
+    try {
+      localStorage.removeItem('shieldurl_scan_history');
+      localStorage.removeItem('scanHistory');
+    } catch (e) {}
+    scanHistory = [];
+    renderHistoryTable();
     updateUserSessionUI();
   }
 
@@ -425,15 +428,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const type = ruleTypeSelect.value;
     if (domain) {
       try {
-        const res = await fetch('/api/rules', {
+        const res = await authFetch('/api/rules', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ domain, type })
         });
         if (res.ok) {
           fetchRulesFromApi();
           ruleDomainInput.value = '';
-          showToast(`Added ${type} rule for ${domain} in Supabase!`, 'success');
+          showToast(`Added ${type} rule for ${domain}!`, 'success');
           return;
         }
       } catch (err) {}
@@ -453,18 +455,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     rulesTbody.innerHTML = domainRules.map(r => `<tr>
-      <td style="font-weight:600">${r.domain}</td>
-      <td><span class="source-status ${r.type === 'whitelist' ? 'badge-safe' : 'badge-danger'}">${r.type.toUpperCase()}</span></td>
-      <td class="text-right"><button class="action-btn-sm delete" onclick="deleteDomainRule('${r.domain}')"><i class="fa-solid fa-trash-can"></i></button></td>
+      <td style="font-weight:600">${escapeHtml(r.domain)}</td>
+      <td><span class="source-status ${r.type === 'whitelist' ? 'badge-safe' : 'badge-danger'}">${escapeHtml(r.type.toUpperCase())}</span></td>
+      <td class="text-right"><button class="action-btn-sm delete" onclick="deleteDomainRule('${escapeHtml(r.domain)}')"><i class="fa-solid fa-trash-can"></i></button></td>
     </tr>`).join('');
   }
 
   window.deleteDomainRule = async function(domain) {
     try {
-      const res = await fetch(`/api/rules/${encodeURIComponent(domain)}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/rules/${encodeURIComponent(domain)}`, { method: 'DELETE' });
       if (res.ok) {
         fetchRulesFromApi();
-        showToast(`Removed rule for ${domain} from Supabase`, 'info');
+        showToast(`Removed rule for ${domain}`, 'info');
         return;
       }
     } catch (e) {}
@@ -517,19 +519,22 @@ document.addEventListener('DOMContentLoaded', () => {
   btnSaveKeys.addEventListener('click', async () => {
     const vtKey = vtApiKeyInput.value.trim();
     const gsbKey = gsbApiKeyInput.value.trim();
-    localStorage.setItem(API_KEY_STORAGE, JSON.stringify({ vt: vtKey, gsb: gsbKey }));
-    updateApiKeyStatusHints(vtKey, gsbKey);
     apiModal.style.display = 'none';
 
     try {
-      await fetch('/api/keys', {
+      const res = await authFetch('/api/keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vt: vtKey, gsb: gsbKey })
       });
-      showToast('Threat Intelligence API Keys saved to Supabase!', 'success');
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Threat Intelligence API Keys saved!', 'success');
+        updateApiKeyStatusHints(Boolean(vtKey), Boolean(gsbKey));
+      } else {
+        showToast(data.error || 'Failed to save API keys.', 'danger');
+      }
     } catch (e) {
-      showToast('Threat Intelligence API Keys saved locally.', 'success');
+      showToast('Error saving API Keys.', 'danger');
     }
   });
 
@@ -1277,22 +1282,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveScanToHistory(result) {
     if (!result || !result.url) return;
 
-    // Remove duplicates of same URL and place new scan at top of history
+    // Session-only history: prepend new scan to in-memory scanHistory array
     scanHistory = scanHistory.filter(item => item.url !== result.url);
     scanHistory.unshift(result);
     if (scanHistory.length > 50) scanHistory.pop();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
 
-    // Clear search and filter so the newly scanned URL is immediately visible to user
     if (historySearch) historySearch.value = '';
     if (historyFilter) historyFilter.value = 'all';
 
     renderHistoryTable();
 
     try {
-      const res = await fetch('/api/scans', {
+      const res = await authFetch('/api/scans', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: result.url,
           domain: result.domain,
@@ -1308,12 +1310,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (data && data.scan && data.scan.id) {
           result.id = data.scan.id;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
         }
       }
       fetchKpisFromApi();
     } catch (e) {
-      console.warn('Backend scan persistence warning:', e);
+      console.warn('Backend scan audit logging warning:', e);
     }
   }
 
@@ -1361,40 +1362,36 @@ document.addEventListener('DOMContentLoaded', () => {
       const itemUrl = item.url || item.domain || 'N/A';
 
       return `<tr>
-        <td><span class="table-url" title="${itemUrl}">${itemUrl}</span></td>
+        <td><span class="table-url" title="${escapeHtml(itemUrl)}">${escapeHtml(itemUrl)}</span></td>
         <td><span class="table-score" style="color:${getScoreColor(score)}">${score}/100</span></td>
-        <td><span class="source-status ${badgeClass}">${rText}</span></td>
-        <td style="color:var(--text-muted);font-size:.8rem">${itemTime}</td>
+        <td><span class="source-status ${escapeHtml(badgeClass)}">${escapeHtml(rText)}</span></td>
+        <td style="color:var(--text-muted);font-size:.8rem">${escapeHtml(itemTime)}</td>
         <td class="text-right">
-          <button class="action-btn-sm" title="Re-scan URL" onclick="rescanHistoryItem('${itemUrl}')"><i class="fa-solid fa-rotate-right"></i></button>
-          <button class="action-btn-sm delete" title="Delete record" onclick="deleteHistoryItem('${item.id}')"><i class="fa-solid fa-trash-can"></i></button>
+          <button class="action-btn-sm" title="Re-scan URL" onclick="rescanHistoryItem('${escapeHtml(itemUrl)}')"><i class="fa-solid fa-rotate-right"></i></button>
+          <button class="action-btn-sm delete" title="Delete record" onclick="deleteHistoryItem('${escapeHtml(item.id)}')"><i class="fa-solid fa-trash-can"></i></button>
         </td>
       </tr>`;
     }).join('');
   }
 
   window.rescanHistoryItem = function(url) { urlInput.value = url; btnClearUrl.style.display = 'block'; startSecurityScan(url); };
-  window.deleteHistoryItem = async function(id) {
-    try {
-      if (typeof id === 'number' || !isNaN(id)) {
-        await fetch(`/api/scans/${id}`, { method: 'DELETE' });
-      }
-    } catch (e) {}
-
+  window.deleteHistoryItem = function(id) {
+    // Session-only: remove item from in-memory scanHistory without modifying database
     scanHistory = scanHistory.filter(i => i.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scanHistory));
-    renderHistoryTable(); fetchKpisFromApi(); showToast('Record deleted.', 'info');
+    renderHistoryTable();
+    showToast('Record deleted from active session.', 'info');
   };
 
-  async function clearAllHistory() {
+  function clearAllHistory() {
     if (scanHistory.length === 0) return;
-    if (confirm('Clear all scan history?')) {
+    if (confirm('Clear current session scan history?')) {
+      scanHistory = [];
       try {
-        await fetch('/api/scans', { method: 'DELETE' });
+        localStorage.removeItem('shieldurl_scan_history');
+        localStorage.removeItem('scanHistory');
       } catch (e) {}
-
-      scanHistory = []; localStorage.removeItem(STORAGE_KEY);
-      renderHistoryTable(); fetchKpisFromApi(); showToast('History cleared.', 'success');
+      renderHistoryTable();
+      showToast('Session scan history cleared.', 'success');
     }
   }
 

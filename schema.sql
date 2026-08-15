@@ -63,3 +63,92 @@ CREATE TABLE api_keys (
     webhook_url TEXT DEFAULT '',
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================================
+-- 5. ROW LEVEL SECURITY (RLS) & POLICY ENFORCEMENT
+-- ============================================================================
+
+-- Enable RLS on all public tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE domain_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scan_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+
+-- Helper Function: Check user role (SECURITY DEFINER with fixed search_path)
+CREATE OR REPLACE FUNCTION get_auth_user_role()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_role TEXT;
+BEGIN
+  v_role := NULLIF(current_setting('request.jwt.claims', true)::json->>'role', '');
+  IF v_role IS NOT NULL AND v_role <> 'authenticated' AND v_role <> 'anon' THEN
+    RETURN v_role;
+  END IF;
+
+  SELECT u.role INTO v_role
+  FROM public.users u
+  WHERE LOWER(u.email) = LOWER(NULLIF(current_setting('request.jwt.claims', true)::json->>'email', ''))
+     OR u.id = NULLIF(current_setting('app.current_user_id', true), '')::integer
+  LIMIT 1;
+
+  RETURN COALESCE(v_role, 'Security Analyst');
+END;
+$$;
+
+-- Helper Function: Check if session belongs to Admin
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN LOWER(get_auth_user_role()) IN ('admin', 'administrator');
+END;
+$$;
+
+-- Helper Function: Retrieve active authenticated user ID
+CREATE OR REPLACE FUNCTION get_auth_user_id()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_id INTEGER;
+BEGIN
+  v_id := NULLIF(current_setting('app.current_user_id', true), '')::integer;
+  IF v_id IS NOT NULL THEN
+    RETURN v_id;
+  END IF;
+
+  SELECT u.id INTO v_id
+  FROM public.users u
+  WHERE LOWER(u.email) = LOWER(NULLIF(current_setting('request.jwt.claims', true)::json->>'email', ''))
+  LIMIT 1;
+
+  RETURN v_id;
+END;
+$$;
+
+-- Revoke anon access
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+
+-- RLS Policies
+DROP POLICY IF EXISTS "users_read_own_or_admin" ON users;
+CREATE POLICY "users_read_own_or_admin" ON users FOR SELECT TO authenticated, service_role USING (id = get_auth_user_id() OR is_admin());
+
+DROP POLICY IF EXISTS "rules_read_own_or_admin" ON domain_rules;
+CREATE POLICY "rules_read_own_or_admin" ON domain_rules FOR SELECT TO authenticated, service_role USING (user_id = get_auth_user_id() OR is_admin());
+
+DROP POLICY IF EXISTS "scans_read_own_or_admin" ON scan_history;
+CREATE POLICY "scans_read_own_or_admin" ON scan_history FOR SELECT TO authenticated, service_role USING (user_id = get_auth_user_id() OR is_admin());
+
+DROP POLICY IF EXISTS "admin_only_api_keys" ON api_keys;
+CREATE POLICY "admin_only_api_keys" ON api_keys FOR ALL TO authenticated, service_role USING (is_admin()) WITH CHECK (is_admin());
+

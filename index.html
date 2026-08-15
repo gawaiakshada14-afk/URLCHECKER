@@ -129,18 +129,18 @@
           <!-- Quick Stat Highlights -->
           <div class="hero-stats">
             <div class="stat-item">
-              <span class="stat-number" data-target="99.8">99.8%</span>
-              <span class="stat-label">Detection Rate</span>
+              <span class="stat-number"><i class="fa-solid fa-shield-halved"></i></span>
+              <span class="stat-label">Multi-Source Threat Intelligence</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-number" data-target="1.4">1.4s</span>
-              <span class="stat-label">Avg Scan Speed</span>
+              <span class="stat-number"><i class="fa-solid fa-bolt"></i></span>
+              <span class="stat-label">Real-Time URL Risk Analysis</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-number" data-target="150">150+</span>
-              <span class="stat-label">Heuristic Rules</span>
+              <span class="stat-number"><i class="fa-solid fa-brain"></i></span>
+              <span class="stat-label">Heuristic + Reputation Analysis</span>
             </div>
           </div>
         </div>
@@ -547,10 +547,10 @@
     <section id="history" class="history-section">
       <div class="container">
         <div class="section-header text-center">
-          <span class="section-subtitle">Local Data Vault</span>
+          <span class="section-subtitle">Active Session Vault</span>
           <h2 class="section-title">Scan History Dashboard</h2>
           <p class="section-description">
-            Your previous URL security audits are stored securely in your local browser storage for quick review and report exports.
+            URL security audits performed during your current login session are displayed below.
           </p>
         </div>
 
@@ -559,27 +559,23 @@
           <!-- History Controls Header -->
           <div class="history-toolbar">
             <div class="search-box">
-              <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="history-search" placeholder="Search URL or domain..." autocomplete="off">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="history-search" placeholder="Search URL or domain..." aria-label="Search scan history">
             </div>
 
-            <div class="filter-box">
-              <select id="history-filter" class="custom-select">
+            <div class="history-filter-group">
+              <select id="history-filter" class="custom-select" aria-label="Filter scan history by risk level">
                 <option value="all">All Risk Levels</option>
-                <option value="safe">🟢 Safe Only</option>
-                <option value="suspicious">🟡 Suspicious</option>
-                <option value="malicious">🔴 Malicious</option>
+                <option value="safe">Safe Only</option>
+                <option value="suspicious">Suspicious</option>
+                <option value="malicious">Malicious</option>
               </select>
-            </div>
 
-            <div class="history-actions">
-              <button id="btn-export-csv" class="btn-secondary btn-sm" title="Export history as CSV">
-                <i class="fa-solid fa-file-csv"></i> Export CSV
-              </button>
-              <button id="btn-export-history" class="btn-secondary btn-sm" title="Export history as JSON">
+              <button id="btn-export-history" class="btn-secondary btn-sm" title="Export session scan history as JSON">
                 <i class="fa-solid fa-download"></i> Export JSON
               </button>
-              <button id="btn-clear-history" class="btn-danger btn-sm" title="Clear all scan history">
+
+              <button id="btn-clear-history" class="btn-danger-outline btn-sm" title="Clear current session scan history">
                 <i class="fa-solid fa-trash-can"></i> Clear History
               </button>
             </div>
@@ -606,8 +602,8 @@
           <!-- Empty State -->
           <div id="history-empty" class="history-empty-state" style="display: none;">
             <i class="fa-solid fa-folder-open empty-icon"></i>
-            <h4>No Scan History Found</h4>
-            <p>Enter a website URL in the scanner above to generate your first security report.</p>
+            <h4>No scan history yet</h4>
+            <p>Your scans from this login session will appear here.</p>
           </div>
 
         </div>
