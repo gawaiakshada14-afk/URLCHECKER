@@ -424,12 +424,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateUserSessionUI() {
+    const dbStatusBadge = document.getElementById('db-status-badge');
+    const btnApiModal = document.getElementById('btn-api-modal');
+    const btnAdminModal = document.getElementById('btn-admin-modal');
+    const btnOpenAi = document.getElementById('btn-open-ai-drawer');
+
     if (currentUser) {
       btnOpenAuth.style.display = 'none'; userProfileMenu.style.display = 'block';
       userDisplayName.textContent = currentUser.name; userAvatarInitials.textContent = currentUser.initials;
       dropdownUserName.textContent = currentUser.name; dropdownUserEmail.textContent = currentUser.email;
+
+      if (dbStatusBadge) dbStatusBadge.style.display = 'inline-flex';
+      if (btnApiModal) btnApiModal.style.display = 'inline-flex';
+      if (btnAdminModal) btnAdminModal.style.display = 'inline-flex';
+      if (btnOpenAi) btnOpenAi.style.display = 'inline-flex';
     } else {
       btnOpenAuth.style.display = 'inline-flex'; userProfileMenu.style.display = 'none';
+
+      if (dbStatusBadge) dbStatusBadge.style.display = 'none';
+      if (btnApiModal) btnApiModal.style.display = 'none';
+      if (btnAdminModal) btnAdminModal.style.display = 'none';
+      if (btnOpenAi) btnOpenAi.style.display = 'none';
     }
   }
 
@@ -614,30 +629,54 @@ document.addEventListener('DOMContentLoaded', () => {
   // ========================================================================
 
   /**
+   * Defensive Private / Internal IP Helper (SSRF Protection)
+   */
+  function isPrivateIp(ip) {
+    if (!ip || typeof ip !== 'string') return false;
+    const clean = ip.trim().toLowerCase();
+    if (clean === 'localhost' || clean === '::1' || clean === '0.0.0.0') return true;
+    const match = clean.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (match) {
+      const a = parseInt(match[1], 10);
+      const b = parseInt(match[2], 10);
+      if (a === 127) return true; // 127.0.0.0/8 Loopback
+      if (a === 10) return true; // 10.0.0.0/8 Private
+      if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 Private
+      if (a === 192 && b === 168) return true; // 192.168.0.0/16 Private
+      if (a === 169 && b === 254) return true; // 169.254.0.0/16 Link-local / Metadata
+      if (a === 0) return true;
+    }
+    return false;
+  }
+
+  /**
    * Fetches REAL DNS A-record via Google DNS & Cloudflare DNS over HTTPS
    */
   async function fetchLiveDns(hostname) {
-    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
-      return { resolved: true, ip: hostname, status: 'RAW_IP', isReal: true, provider: 'Direct IPv4' };
+    const cleanHost = hostname.toLowerCase();
+    const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(cleanHost) || cleanHost === 'localhost' || cleanHost === '::1';
+    if (isIp) {
+      const resolvedIp = cleanHost === 'localhost' ? '127.0.0.1' : cleanHost;
+      return { resolved: true, ip: resolvedIp, status: 'RAW_IP', isReal: true, provider: 'Direct Address' };
     }
 
     // 1. Google DNS-over-HTTPS (Primary)
     try {
-      const gRes = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`);
+      const gRes = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanHost)}&type=A`);
       if (gRes.ok) {
         const gData = await gRes.json();
         if (gData.Status === 0 && gData.Answer && gData.Answer.length > 0) {
           const aRec = gData.Answer.find(a => a.type === 1) || gData.Answer[0];
           return { resolved: true, ip: aRec.data, ttl: aRec.TTL, status: 'NOERROR', provider: 'Google DoH', isReal: true };
         } else if (gData.Status === 3) {
-          return { resolved: false, ip: 'NXDOMAIN', status: 'NXDOMAIN', provider: 'Google DoH', isReal: true };
+          return { resolved: false, ip: 'NXDOMAIN', status: 'NXDOMAIN (Domain Not Found)', provider: 'Google DoH', isReal: true };
         }
       }
     } catch (e) { console.warn('Google DoH failed:', e); }
 
     // 2. Cloudflare DNS-over-HTTPS (Fallback)
     try {
-      const cRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`, {
+      const cRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(cleanHost)}&type=A`, {
         headers: { 'Accept': 'application/dns-json' }
       });
       if (cRes.ok) {
@@ -646,18 +685,22 @@ document.addEventListener('DOMContentLoaded', () => {
           const aRec = cData.Answer.find(a => a.type === 1) || cData.Answer[0];
           return { resolved: true, ip: aRec.data, ttl: aRec.TTL, status: 'NOERROR', provider: 'Cloudflare DoH', isReal: true };
         } else if (cData.Status === 3) {
-          return { resolved: false, ip: 'NXDOMAIN', status: 'NXDOMAIN', provider: 'Cloudflare DoH', isReal: true };
+          return { resolved: false, ip: 'NXDOMAIN', status: 'NXDOMAIN (Domain Not Found)', provider: 'Cloudflare DoH', isReal: true };
         }
       }
     } catch (e) { console.warn('Cloudflare DoH failed:', e); }
 
-    return { resolved: true, ip: generateSimulatedIp(hostname), status: 'FALLBACK', provider: 'Simulated', isReal: false };
+    return { resolved: false, ip: 'Unresolved', status: 'Unresolved DNS', provider: 'DNS', isReal: false };
   }
 
   /**
    * Fetches REAL domain WHOIS/RDAP creation date & registrar via direct Verisign/PIR RDAP endpoints
    */
   async function fetchDomainRdap(hostname) {
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === 'localhost' || hostname === '::1') {
+      return { found: false, registrar: 'N/A (IP Target)', creationDate: 'N/A', ageDays: null, isReal: true };
+    }
+
     const parts = hostname.split('.');
     const baseDomain = parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
     const tld = baseDomain.split('.').pop().toLowerCase();
@@ -706,7 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
               found: true,
               registrar,
               creationDate: creationDate ? creationDate.toLocaleDateString() : 'Active',
-              ageDays: ageDays !== null ? ageDays : 1000,
+              ageDays: ageDays !== null ? ageDays : 365,
               isReal: true
             };
           }
@@ -714,15 +757,19 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) { console.warn('RDAP fetch error:', e); }
     }
 
-    return { found: true, registrar: 'Registry Active', creationDate: 'Established', ageDays: 1200, isReal: true };
+    return { found: false, registrar: 'WHOIS Record Unavailable', creationDate: 'Unavailable', ageDays: null, isReal: false };
   }
 
   /**
    * Fetches REAL IP geolocation & ISP data via freeipapi.com
    */
   async function fetchIpGeo(ip) {
-    if (!ip || ip === 'NXDOMAIN' || ip === 'NODATA' || /^192\.168\./.test(ip) || /^10\./.test(ip) || /^127\./.test(ip)) {
-      return { found: false, country: 'Internal Network', isp: 'Private Network', org: 'N/A', isReal: false };
+    if (!ip || ip === 'NXDOMAIN' || ip === 'Unresolved' || ip === 'NODATA') {
+      return { found: false, country: 'Unavailable', isp: 'Unavailable', org: 'N/A', isReal: false };
+    }
+
+    if (isPrivateIp(ip)) {
+      return { found: true, country: 'Private / Local Network', isp: 'Internal Network / Loopback', org: 'Localhost', isPrivate: true, isReal: true };
     }
 
     try {
@@ -743,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (e) { console.warn('FreeIPAPI failed:', e); }
 
-    return { found: false, country: 'Public IP', isp: 'Verified ISP', org: 'N/A', isReal: false };
+    return { found: false, country: 'Public IP', isp: 'ISP Info Unavailable', org: 'N/A', isReal: false };
   }
 
   /**
@@ -765,7 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('Backend VirusTotal proxy fetch failed:', e);
     }
 
-    return { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Could not reach VirusTotal API endpoint.' };
+    return { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'VirusTotal API unconfigured. Threat status not checked.' };
   }
 
   /**
@@ -773,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function fetchGoogleSafeBrowsing(url, apiKey) {
     if (!apiKey) {
-      return { configured: false, status: 'No API Key', badge: 'badge-warning', desc: 'Add a Google Safe Browsing API key in Settings for official Google threat queries.' };
+      return { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
     }
 
     try {
@@ -973,12 +1020,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const checks = [];
     let penalty = 0;
 
+    // --- 0. SSRF & Internal Network Target Protection ---
+    if (isPrivateIp(hostname) || isPrivateIp(liveDns.ip)) {
+      penalty += 100;
+      checks.push({
+        id: 'ssrf',
+        title: 'INTERNAL / RESTRICTED TARGET (SSRF ALERT)',
+        desc: `Target resolves to a restricted internal IP or loopback address (${liveDns.ip || hostname}). Accessing local network resources or cloud metadata is blocked.`,
+        status: 'fail',
+        tag: 'BLOCKED / UNSAFE'
+      });
+    }
+
     // --- 1. Live DNS Resolution ---
-    if (liveDns.isReal && !liveDns.resolved) {
-      penalty += 50;
-      checks.push({ id: 'dns', title: 'LIVE DNS FAILURE — Domain Does Not Exist', desc: `DNS resolution returned NXDOMAIN. This domain is not registered or active.`, status: 'fail', tag: 'NXDOMAIN' });
-    } else if (liveDns.resolved) {
-      checks.push({ id: 'dns', title: 'Live DNS Resolution Verified', desc: `Resolves to ${liveDns.ip} via ${liveDns.provider || 'DNS'} (TTL: ${liveDns.ttl || '300'}s).`, status: 'pass', tag: 'DNS OK' });
+    if (!liveDns.resolved) {
+      penalty += 15;
+      checks.push({ id: 'dns', title: 'Live DNS Inspection — Domain Unresolved / NXDOMAIN', desc: `DNS resolution returned ${liveDns.status || 'NXDOMAIN'}. Domain has no active A-records.`, status: 'warning', tag: 'NXDOMAIN' });
+    } else {
+      checks.push({ id: 'dns', title: 'Live DNS Resolution Verified', desc: `Resolves to ${liveDns.ip} via ${liveDns.provider || 'DNS'}${liveDns.ttl ? ' (TTL: ' + liveDns.ttl + 's)' : ''}.`, status: 'pass', tag: 'DNS OK' });
     }
 
     // --- 2. Custom Whitelist / Blacklist ---
@@ -1003,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 4. Raw IP Address Host ---
     const isIpHost = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
-    if (isIpHost) {
+    if (isIpHost && !isPrivateIp(hostname)) {
       penalty += 30;
       checks.push({ id: 'ip', title: 'Raw IP Address Hostname', desc: 'Legitimate web applications use registered domain names.', status: 'fail', tag: 'RAW IP' });
     }
@@ -1029,8 +1088,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const years = Math.floor(rdap.ageDays / 365);
         checks.push({ id: 'age', title: `Domain Age Verified (${years > 0 ? years + '+ years' : rdap.ageDays + ' days'})`, desc: `Registered ${rdap.creationDate} via ${rdap.registrar}.`, status: 'pass', tag: 'VERIFIED' });
       }
+    } else if (isIpHost) {
+      checks.push({ id: 'age', title: 'Direct IP Target (No WHOIS Domain Record)', desc: 'Direct IP target does not have domain registration records.', status: 'warning', tag: 'IP TARGET' });
     } else {
-      checks.push({ id: 'age', title: 'Domain Registration Active', desc: 'Domain registry records verified and active.', status: 'pass', tag: 'ACTIVE' });
+      checks.push({ id: 'age', title: 'WHOIS Record Inspection', desc: 'Domain active; detailed RDAP creation record unlisted or private.', status: 'pass', tag: 'ACTIVE' });
     }
 
     // --- 7. Phishing Keywords in Non-Official Domains ---
@@ -1110,30 +1171,46 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildThreatIntelResults(parsedUrl, liveDns, urlhaus, vt, gsb, httpAudit) {
     let penalty = 0;
 
-    // URLhaus
+    // URLhaus (abuse.ch)
     let urlhausResult = urlhaus;
-    if (urlhaus.found) penalty += 35;
+    if (urlhaus.found) penalty += 80;
 
-    // VirusTotal
+    // VirusTotal API v3 - Weighted penalties:
+    // 1 isolated vendor flag (low confidence noise): small penalty -8 pts.
+    // 2 vendor flags: penalty -20 pts.
+    // 3-4 vendor flags: penalty -45 pts.
+    // 5+ vendor flags: penalty -70 pts.
     let vtResult = vt;
-    if (vt.configured && vt.flagged > 0) penalty += 40;
-
-    // Google Safe Browsing
-    let gsbResult = gsb;
-    if (gsb.configured && gsb.status === 'THREAT MATCH') penalty += 45;
-
-    // PhishTank pattern match
-    let phishResult;
-    const host = parsedUrl.hostname.toLowerCase();
-    const looksPhishy = host.includes('login') && (host.includes('paypal') || host.includes('bank') || host.includes('verify'));
-    if (looksPhishy && !TRUSTED_DOMAINS.has(getBaseDomain(host))) {
-      penalty += 20;
-      phishResult = { status: 'Likely Phish', badge: 'badge-danger', desc: 'URL pattern matches known phishing templates.' };
-    } else {
-      phishResult = { status: 'Unlisted', badge: 'badge-safe', desc: 'URL is clean and unlisted in PhishTank community database.' };
+    if (vt.configured && vt.flagged > 0) {
+      if (vt.flagged === 1) {
+        penalty += 8;
+      } else if (vt.flagged === 2) {
+        penalty += 20;
+      } else if (vt.flagged < 5) {
+        penalty += 45;
+      } else {
+        penalty += 70;
+      }
     }
 
-    // HTTP Reachability
+    // Google Safe Browsing API v4
+    let gsbResult = gsb;
+    if (gsb.configured && gsb.status === 'THREAT MATCH') penalty += 80;
+
+    // PhishTank & Phishing Heuristic Pattern Match
+    let phishResult;
+    const host = parsedUrl.hostname.toLowerCase();
+    const fullUrlLower = (parsedUrl.href || parsedUrl.toString() || '').toLowerCase();
+    const looksPhishy = (host.includes('login') || fullUrlLower.includes('login')) && 
+                        (host.includes('paypal') || host.includes('bank') || host.includes('verify') || fullUrlLower.includes('verify'));
+    if (looksPhishy && !TRUSTED_DOMAINS.has(getBaseDomain(host))) {
+      penalty += 40;
+      phishResult = { status: 'Likely Phish', badge: 'badge-danger', desc: 'URL structure matches known credential-harvesting phishing templates.' };
+    } else {
+      phishResult = { status: 'Unlisted', badge: 'badge-safe', desc: 'URL pattern is unlisted in active PhishTank community database.' };
+    }
+
+    // HTTP Reachability Audit
     let httpResult = httpAudit;
 
     return {
@@ -1147,27 +1224,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ========================================================================
-  // 11. FINAL SCORE ASSEMBLY
+  // 11. FINAL EVIDENCE-BASED SCORE & RISK CLASSIFICATION ASSEMBLY
   // ========================================================================
 
   function assembleSecurityResult(rawUrl, parsedUrl, heuristics, threatIntel, liveDns, rdap, ipGeo) {
-    const totalPenalty = heuristics.penalty + threatIntel.penalty;
-    let score = Math.max(0, Math.min(100, 100 - totalPenalty));
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const baseDomain = getBaseDomain(hostname);
+    const isTopTrusted = TRUSTED_DOMAINS.has(baseDomain);
 
+    // 1. Evidence-based Base Score
+    let baseScore = 75; // Baseline score for standard domain
+    if (isTopTrusted) {
+      baseScore = 90; // Top-ranked global domain (e.g. google.com, github.com)
+    } else if (rdap.found && rdap.ageDays) {
+      if (rdap.ageDays > 1825) baseScore = 85; // Domain older than 5 years
+      else if (rdap.ageDays > 365) baseScore = 80; // Domain older than 1 year
+    }
+
+    // 2. Positive Evidence Adjustments (+5 to +15 total)
+    let bonus = 0;
+    if (parsedUrl.protocol === 'https:') bonus += 5;
+    if (threatIntel.urlHaus && threatIntel.urlHaus.found === false) bonus += 5;
+    if (threatIntel.phishTank && threatIntel.phishTank.status === 'Unlisted') bonus += 5;
+    if (threatIntel.googleSafe && threatIntel.googleSafe.configured && threatIntel.googleSafe.status === 'Clean') bonus += 5;
+    if (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged === 0) bonus += 5;
+
+    // 3. Compute Evidence-based Penalties
+    const totalPenalty = heuristics.penalty + threatIntel.penalty;
+    let score = Math.max(0, Math.min(100, Math.round(baseScore + bonus - totalPenalty)));
+
+    // 4. Combined Evidence Capping Rules:
+
+    // Rule A: Confirmed Malicious Threat (URLhaus listed, GSB match, VT >= 3 flags, SSRF alert, Typosquatting, Blacklist)
+    const isConfirmedMalicious = (
+      (threatIntel.urlHaus && threatIntel.urlHaus.found) ||
+      (threatIntel.googleSafe && threatIntel.googleSafe.status === 'THREAT MATCH') ||
+      (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged >= 3) ||
+      heuristics.checks.some(c => c.tag === 'BLOCKED / UNSAFE' || c.tag === 'SPOOFED' || c.tag === 'BLACKLISTED')
+    );
+
+    // Rule B: Strong Phishing Indicators (even if threat DBs return no match, CANNOT be 100/100 SAFE)
+    const hasStrongPhishingIndicators = (
+      heuristics.checks.some(c => c.tag === 'PHISHING' || c.tag === 'EXECUTABLE') ||
+      (threatIntel.phishTank && threatIntel.phishTank.status === 'Likely Phish')
+    );
+
+    // Rule C: Moderate Suspicious Signal (2 VT flags or 2+ failing structural checks)
+    const isSuspiciousThreat = (
+      (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged === 2) ||
+      heuristics.checks.filter(c => c.status === 'fail' && c.id !== 'ssl').length >= 2
+    );
+
+    if (isConfirmedMalicious) {
+      score = Math.min(score, 25); // Cap at <= 25 -> MALICIOUS
+    } else {
+      // Heuristic indicators alone without confirmed threat evidence CANNOT force MALICIOUS (<40)
+      if (hasStrongPhishingIndicators && !isTopTrusted) {
+        score = Math.min(score, 60); // Cap at <= 60 -> SUSPICIOUS (Never 100/100 SAFE)
+      } else if (isSuspiciousThreat) {
+        score = Math.min(score, 50); // Cap at <= 50 -> SUSPICIOUS
+      }
+      score = Math.max(40, score); // Non-malicious floor ensures heuristics alone do not trigger MALICIOUS
+    }
+
+    // 5. Risk Classification strictly aligned with score & combined evidence
     let riskLevel, riskBadgeClass, riskBadgeIcon, summaryDesc;
 
     if (score >= 85) {
-      riskLevel = 'SAFE'; riskBadgeClass = 'safe'; riskBadgeIcon = 'fa-shield-check';
-      summaryDesc = 'This website passed live DNS resolution, domain age verification, heuristic analysis, and threat database checks.';
+      riskLevel = 'SAFE';
+      riskBadgeClass = 'safe';
+      riskBadgeIcon = 'fa-shield-check';
+      summaryDesc = 'This website passed live DNS resolution, domain age verification, heuristic analysis, and security checks.';
     } else if (score >= 65) {
-      riskLevel = 'LOW RISK'; riskBadgeClass = 'warning'; riskBadgeIcon = 'fa-circle-info';
-      summaryDesc = 'Domain is likely safe but has minor risk indicators — review the detailed breakdown below.';
+      riskLevel = 'LOW RISK';
+      riskBadgeClass = 'warning';
+      riskBadgeIcon = 'fa-circle-info';
+      summaryDesc = 'Domain has standard reputation with minor risk warnings — review detailed findings below.';
     } else if (score >= 40) {
-      riskLevel = 'SUSPICIOUS'; riskBadgeClass = 'warning'; riskBadgeIcon = 'fa-triangle-exclamation';
-      summaryDesc = 'CAUTION: Multiple risk indicators detected including structural anomalies or missing trust signals.';
+      riskLevel = 'SUSPICIOUS';
+      riskBadgeClass = 'warning';
+      riskBadgeIcon = 'fa-triangle-exclamation';
+      summaryDesc = 'CAUTION: Multiple risk indicators or threat intelligence vendor flags detected — exercise caution.';
     } else {
-      riskLevel = 'MALICIOUS'; riskBadgeClass = 'danger'; riskBadgeIcon = 'fa-triangle-exclamation';
-      summaryDesc = 'DANGER: High probability of phishing, malware, or credential harvesting. Do NOT interact with this URL.';
+      riskLevel = 'MALICIOUS';
+      riskBadgeClass = 'danger';
+      riskBadgeIcon = 'fa-triangle-exclamation';
+      summaryDesc = 'DANGER: Confirmed phishing, malware, or security threat detected. Do NOT enter credentials or interact with this URL.';
     }
 
     return {

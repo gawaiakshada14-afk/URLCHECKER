@@ -589,8 +589,8 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
     const vt_key = process.env.API_KEY || req.body.vtKey || keysRes.rows[0]?.vt_key || process.env.VT_API_KEY || '';
     const gsb_key = process.env.GOOGLE_BROWSING_KEY || req.body.gsbKey || keysRes.rows[0]?.gsb_key || process.env.GSB_API_KEY || '';
 
-    let vtResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Threat intelligence provider unconfigured. Verdict is inconclusive.' };
-    let gsbResult = { configured: false, status: 'Inconclusive / No Key', badge: 'badge-neutral', desc: 'Google Safe Browsing unconfigured. Verdict is inconclusive.' };
+    let vtResult = { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'VirusTotal API unconfigured. Threat status not checked.' };
+    let gsbResult = { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
 
     if (vt_key) {
       try {
