@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const { query, testConnection } = require('./db');
 const { parseNormalizedIp, isBlockedIp, validateTargetUrl, resolveAndValidateDns, fetchSafeUrl } = require('./ssrf_guard');
+const { evaluateHeuristics, evaluateThreatIntel, calculateSecurityScore } = require('./scoring');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -872,6 +873,15 @@ app.get('/script.js', (req, res) => {
     return res.sendFile(jsPath);
   }
   res.status(404).type('text/plain').send('File not found: script.js');
+});
+
+app.get('/scoring.js', (req, res) => {
+  const jsPath = path.join(__dirname, 'scoring.js');
+  if (fs.existsSync(jsPath)) {
+    res.setHeader('Content-Type', 'application/javascript');
+    return res.sendFile(jsPath);
+  }
+  res.status(404).type('text/plain').send('File not found: scoring.js');
 });
 
 app.get(['/assets/images/hero.svg', '/hero.svg'], (req, res) => {

@@ -1195,6 +1195,7 @@ ul {
 .check-icon-badge.pass { background: var(--safe-bg); color: var(--safe-color); }
 .check-icon-badge.warning { background: var(--warning-bg); color: var(--warning-color); }
 .check-icon-badge.fail { background: var(--danger-bg); color: var(--danger-color); }
+.check-icon-badge.neutral { background: var(--bg-secondary); color: var(--text-muted); }
 
 .check-text-title { font-weight: 600; font-size: 0.95rem; color: var(--text-main); }
 .check-text-desc { font-size: 0.8rem; color: var(--text-muted); }
@@ -1209,6 +1210,7 @@ ul {
 .check-status-tag.pass { background: var(--safe-bg); color: var(--safe-color); border: 1px solid var(--safe-border); }
 .check-status-tag.warning { background: var(--warning-bg); color: var(--warning-color); border: 1px solid var(--warning-border); }
 .check-status-tag.fail { background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-border); }
+.check-status-tag.neutral { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border-color); }
 
 /* Secondary Grid: Domain Metadata & Threat Intelligence */
 .results-secondary-grid {

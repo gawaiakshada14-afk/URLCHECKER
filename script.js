@@ -1010,307 +1010,68 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ========================================================================
-  // 9. ENHANCED HEURISTIC ENGINE (12 Dimensions)
+  // 9. ENHANCED HEURISTIC ENGINE & THREAT INTELLIGENCE ASSEMBLY
   // ========================================================================
 
+  function getScoringEngine() {
+    if (typeof ShieldURLScoring !== 'undefined') {
+      return ShieldURLScoring;
+    }
+    return require('./scoring');
+  }
+
   function performHeuristicAudit(parsedUrl, rawUrl, liveDns, rdap) {
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const fullPath = (parsedUrl.pathname + parsedUrl.search).toLowerCase();
-    const baseDomain = getBaseDomain(hostname);
-    const checks = [];
-    let penalty = 0;
+    const engine = getScoringEngine();
+    const res = engine.evaluateHeuristics(parsedUrl, rawUrl, liveDns, rdap);
 
-    // --- 0. SSRF & Internal Network Target Protection ---
-    if (isPrivateIp(hostname) || isPrivateIp(liveDns.ip)) {
-      penalty += 100;
-      checks.push({
-        id: 'ssrf',
-        title: 'INTERNAL / RESTRICTED TARGET (SSRF ALERT)',
-        desc: `Target resolves to a restricted internal IP or loopback address (${liveDns.ip || hostname}). Accessing local network resources or cloud metadata is blocked.`,
-        status: 'fail',
-        tag: 'BLOCKED / UNSAFE'
-      });
-    }
-
-    // --- 1. Live DNS Resolution ---
-    if (!liveDns.resolved) {
-      penalty += 15;
-      checks.push({ id: 'dns', title: 'Live DNS Inspection — Domain Unresolved / NXDOMAIN', desc: `DNS resolution returned ${liveDns.status || 'NXDOMAIN'}. Domain has no active A-records.`, status: 'warning', tag: 'NXDOMAIN' });
-    } else {
-      checks.push({ id: 'dns', title: 'Live DNS Resolution Verified', desc: `Resolves to ${liveDns.ip} via ${liveDns.provider || 'DNS'}${liveDns.ttl ? ' (TTL: ' + liveDns.ttl + 's)' : ''}.`, status: 'pass', tag: 'DNS OK' });
-    }
-
-    // --- 2. Custom Whitelist / Blacklist ---
+    // Apply custom whitelist/blacklist domain rules if present
+    const hostname = (parsedUrl && parsedUrl.hostname ? parsedUrl.hostname : '').toLowerCase();
     const ruleMatch = domainRules.find(r => hostname.includes(r.domain));
     if (ruleMatch) {
       if (ruleMatch.type === 'blacklist') {
-        penalty += 100;
-        checks.push({ id: 'rule', title: 'Custom Blacklist Rule Match', desc: `Domain explicitly blocked by analyst policy.`, status: 'fail', tag: 'BLACKLISTED' });
+        res.totalDeduction += 100;
+        res.checks.unshift({
+          id: 'rule',
+          title: 'Custom Blacklist Rule Match',
+          desc: `Domain explicitly blocked by analyst policy.`,
+          status: 'fail',
+          tag: 'BLACKLISTED'
+        });
       } else {
-        checks.push({ id: 'rule', title: 'Custom Whitelist Rule Match', desc: `Domain explicitly allowed by analyst policy.`, status: 'pass', tag: 'WHITELISTED' });
+        res.checks.unshift({
+          id: 'rule',
+          title: 'Custom Whitelist Rule Match',
+          desc: `Domain explicitly allowed by analyst policy.`,
+          status: 'pass',
+          tag: 'WHITELISTED'
+        });
       }
     }
 
-    // --- 3. Protocol & HTTPS ---
-    const isHttps = parsedUrl.protocol === 'https:';
-    if (isHttps) {
-      checks.push({ id: 'ssl', title: 'HTTPS Protocol Encrypted', desc: 'Connection uses modern SSL/TLS encryption.', status: 'pass', tag: 'ENCRYPTED' });
-    } else {
-      penalty += 15;
-      checks.push({ id: 'ssl', title: 'Unencrypted HTTP Connection', desc: 'Data transmitted in plain text without SSL encryption.', status: 'fail', tag: 'UNSECURE' });
-    }
-
-    // --- 4. Raw IP Address Host ---
-    const isIpHost = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
-    if (isIpHost && !isPrivateIp(hostname)) {
-      penalty += 30;
-      checks.push({ id: 'ip', title: 'Raw IP Address Hostname', desc: 'Legitimate web applications use registered domain names.', status: 'fail', tag: 'RAW IP' });
-    }
-
-    // --- 5. Domain Trust & Recognition ---
-    if (TRUSTED_DOMAINS.has(baseDomain)) {
-      checks.push({ id: 'trust', title: 'Top-Ranked Global Domain', desc: `${baseDomain} is a top-ranked globally trusted organization domain.`, status: 'pass', tag: 'TRUSTED' });
-    } else if (rdap.found && rdap.ageDays && rdap.ageDays > 365) {
-      checks.push({ id: 'trust', title: 'Established Domain Profile', desc: `Domain has an established track record (>1 year active).`, status: 'pass', tag: 'ESTABLISHED' });
-    } else {
-      checks.push({ id: 'trust', title: 'Standard Domain Reputation', desc: 'Domain is active with standard web reputation profile.', status: 'pass', tag: 'STANDARD' });
-    }
-
-    // --- 6. Domain Age (RDAP data) ---
-    if (rdap.found && rdap.ageDays !== null) {
-      if (rdap.ageDays < 14) {
-        penalty += 25;
-        checks.push({ id: 'age', title: `Newly Registered Domain (${rdap.ageDays} days)`, desc: `Registered ${rdap.creationDate}. Extremely new domains are high-risk for phishing campaigns.`, status: 'fail', tag: 'NEW DOMAIN' });
-      } else if (rdap.ageDays < 90) {
-        penalty += 10;
-        checks.push({ id: 'age', title: `Recently Created Domain (${rdap.ageDays} days)`, desc: `Registered ${rdap.creationDate} via ${rdap.registrar}.`, status: 'warning', tag: 'RECENT' });
-      } else {
-        const years = Math.floor(rdap.ageDays / 365);
-        checks.push({ id: 'age', title: `Domain Age Verified (${years > 0 ? years + '+ years' : rdap.ageDays + ' days'})`, desc: `Registered ${rdap.creationDate} via ${rdap.registrar}.`, status: 'pass', tag: 'VERIFIED' });
-      }
-    } else if (isIpHost) {
-      checks.push({ id: 'age', title: 'Direct IP Target (No WHOIS Domain Record)', desc: 'Direct IP target does not have domain registration records.', status: 'warning', tag: 'IP TARGET' });
-    } else {
-      checks.push({ id: 'age', title: 'WHOIS Record Inspection', desc: 'Domain active; detailed RDAP creation record unlisted or private.', status: 'pass', tag: 'ACTIVE' });
-    }
-
-    // --- 7. Phishing Keywords in Non-Official Domains ---
-    const suspiciousKeywords = ['login','verify','bank','paypal','crypto','binance','account','security','update','claim','airdrop','wallet','free','bonus','support','alert','recover','billing','confirm'];
-    const isOfficialBrand = TRUSTED_DOMAINS.has(baseDomain);
-    const foundKw = suspiciousKeywords.filter(kw => hostname.includes(kw) || fullPath.includes(kw));
-
-    if (foundKw.length >= 2 && !isOfficialBrand) {
-      penalty += 25;
-      checks.push({ id: 'kw', title: `High Phishing Keyword Matches (${foundKw.length})`, desc: `Contains sensitive terms: [${foundKw.join(', ')}] on non-official domain.`, status: 'fail', tag: 'PHISHING' });
-    } else if (foundKw.length > 0 && !isOfficialBrand) {
-      penalty += 8;
-      checks.push({ id: 'kw', title: `Security Keyword Found (${foundKw.length})`, desc: `Detected: [${foundKw.join(', ')}]`, status: 'warning', tag: 'CAUTION' });
-    } else {
-      checks.push({ id: 'kw', title: 'Clean Keyword Inspection', desc: 'No credential-harvesting keywords found in URL structure.', status: 'pass', tag: 'CLEAN' });
-    }
-
-    // --- 8. Brand Impersonation / Typosquatting ---
-    const brandTypos = ['paypa1','g00gle','amaz0n','micro-soft','apple-id','binance-sec','metamask-app','faceb00k','1nstagram','netf1ix'];
-    if (brandTypos.some(b => rawUrl.toLowerCase().includes(b))) {
-      penalty += 35;
-      checks.push({ id: 'typo', title: 'Brand Impersonation / Typosquatting', desc: 'Character substitutions detected mimicking major brand domain.', status: 'fail', tag: 'SPOOFED' });
-    }
-
-    // --- 9. Shannon Entropy ---
-    const entropy = calculateShannonEntropy(hostname);
-    if (entropy > 4.3 && !isOfficialBrand) {
-      penalty += 15;
-      checks.push({ id: 'entropy', title: `High Entropy String (${entropy.toFixed(2)})`, desc: 'Random character patterns suggest automated domain generator (DGA).', status: 'warning', tag: 'HIGH ENTROPY' });
-    } else {
-      checks.push({ id: 'entropy', title: `Normal String Entropy (${entropy.toFixed(2)})`, desc: 'Character distribution matches natural language words.', status: 'pass', tag: 'NORMAL' });
-    }
-
-    // --- 10. URL Length & Subdomain Depth ---
-    const subdomainDepth = hostname.split('.').length - 2;
-    if (rawUrl.length > 100) {
-      penalty += 10;
-      checks.push({ id: 'len', title: `Excessively Long URL (${rawUrl.length} chars)`, desc: 'Long URL strings can hide malicious payloads.', status: 'warning', tag: 'LONG URL' });
-    }
-    if (subdomainDepth >= 3) {
-      penalty += 10;
-      checks.push({ id: 'sub', title: `Subdomain Nesting (${subdomainDepth} levels)`, desc: 'Deep subdomain nesting is often used in phishing links.', status: 'warning', tag: 'DEEP SUBDOMAINS' });
-    }
-
-    // --- 11. Dangerous File Extensions ---
-    const hasDangerousExt = DANGEROUS_EXTENSIONS.some(ext => fullPath.endsWith(ext));
-    if (hasDangerousExt) {
-      penalty += 30;
-      checks.push({ id: 'ext', title: 'Executable Payload in URL Path', desc: 'Path leads to an executable payload file (.exe, .scr, .bat, .apk).', status: 'fail', tag: 'EXECUTABLE' });
-    }
-
-    // --- 12. High Risk TLD ---
-    const tld = hostname.split('.').pop();
-    const highRiskTlds = ['xyz','top','tk','ml','cf','gq','online','club','site','work','click','buzz','monster','icu','cam','rest'];
-    if (highRiskTlds.includes(tld)) {
-      penalty += 10;
-      checks.push({ id: 'tld', title: `High Risk TLD Extension (.${tld})`, desc: `The .${tld} top-level domain is frequently used in phishing campaigns.`, status: 'warning', tag: `.${tld.toUpperCase()}` });
-    }
-
-    return { checks, penalty, entropy: entropy.toFixed(2), tld: '.' + tld, isIpHost };
+    return res;
   }
-
-  function calculateShannonEntropy(str) {
-    const len = str.length;
-    if (len === 0) return 0;
-    const freq = {};
-    for (const c of str) freq[c] = (freq[c] || 0) + 1;
-    let ent = 0;
-    for (const c in freq) { const p = freq[c] / len; ent -= p * Math.log2(p); }
-    return ent;
-  }
-
-  // ========================================================================
-  // 10. THREAT INTELLIGENCE RESULTS BUILDER
-  // ========================================================================
 
   function buildThreatIntelResults(parsedUrl, liveDns, urlhaus, vt, gsb, httpAudit) {
-    let penalty = 0;
+    const engine = getScoringEngine();
 
-    // URLhaus (abuse.ch)
-    let urlhausResult = urlhaus;
-    if (urlhaus.found) penalty += 80;
-
-    // VirusTotal API v3 - Weighted penalties:
-    // 1 isolated vendor flag (low confidence noise): small penalty -8 pts.
-    // 2 vendor flags: penalty -20 pts.
-    // 3-4 vendor flags: penalty -45 pts.
-    // 5+ vendor flags: penalty -70 pts.
-    let vtResult = vt;
-    if (vt.configured && vt.flagged > 0) {
-      if (vt.flagged === 1) {
-        penalty += 8;
-      } else if (vt.flagged === 2) {
-        penalty += 20;
-      } else if (vt.flagged < 5) {
-        penalty += 45;
-      } else {
-        penalty += 70;
-      }
-    }
-
-    // Google Safe Browsing API v4
-    let gsbResult = gsb;
-    if (gsb.configured && gsb.status === 'THREAT MATCH') penalty += 80;
-
-    // PhishTank & Phishing Heuristic Pattern Match
-    let phishResult;
+    // Check PhishTank pattern match
+    let phishResult = { status: 'Unlisted', badge: 'badge-safe', desc: 'URL is unlisted in active PhishTank community database.' };
     const host = parsedUrl.hostname.toLowerCase();
     const fullUrlLower = (parsedUrl.href || parsedUrl.toString() || '').toLowerCase();
     const looksPhishy = (host.includes('login') || fullUrlLower.includes('login')) && 
                         (host.includes('paypal') || host.includes('bank') || host.includes('verify') || fullUrlLower.includes('verify'));
-    if (looksPhishy && !TRUSTED_DOMAINS.has(getBaseDomain(host))) {
-      penalty += 40;
-      phishResult = { status: 'Likely Phish', badge: 'badge-danger', desc: 'URL structure matches known credential-harvesting phishing templates.' };
-    } else {
-      phishResult = { status: 'Unlisted', badge: 'badge-safe', desc: 'URL pattern is unlisted in active PhishTank community database.' };
+    if (looksPhishy && !engine.TRUSTED_DOMAINS.has(engine.getBaseDomain(host))) {
+      phishResult = { found: true, status: 'MALICIOUS LISTED', badge: 'badge-danger', desc: 'URL structure matches known phishing templates.' };
     }
 
-    // HTTP Reachability Audit
-    let httpResult = httpAudit;
-
-    return {
-      googleSafe: gsbResult,
-      virusTotal: vtResult,
-      phishTank: phishResult,
-      urlHaus: urlhausResult,
-      httpAudit: httpResult,
-      penalty
-    };
+    const tiEval = engine.evaluateThreatIntel(parsedUrl, liveDns, urlhaus, vt, gsb, phishResult);
+    tiEval.httpAudit = httpAudit;
+    return tiEval;
   }
 
-  // ========================================================================
-  // 11. FINAL EVIDENCE-BASED SCORE & RISK CLASSIFICATION ASSEMBLY
-  // ========================================================================
-
   function assembleSecurityResult(rawUrl, parsedUrl, heuristics, threatIntel, liveDns, rdap, ipGeo) {
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const baseDomain = getBaseDomain(hostname);
-    const isTopTrusted = TRUSTED_DOMAINS.has(baseDomain);
-
-    // 1. Evidence-based Base Score
-    let baseScore = 75; // Baseline score for standard domain
-    if (isTopTrusted) {
-      baseScore = 90; // Top-ranked global domain (e.g. google.com, github.com)
-    } else if (rdap.found && rdap.ageDays) {
-      if (rdap.ageDays > 1825) baseScore = 85; // Domain older than 5 years
-      else if (rdap.ageDays > 365) baseScore = 80; // Domain older than 1 year
-    }
-
-    // 2. Positive Evidence Adjustments (+5 to +15 total)
-    let bonus = 0;
-    if (parsedUrl.protocol === 'https:') bonus += 5;
-    if (threatIntel.urlHaus && threatIntel.urlHaus.found === false) bonus += 5;
-    if (threatIntel.phishTank && threatIntel.phishTank.status === 'Unlisted') bonus += 5;
-    if (threatIntel.googleSafe && threatIntel.googleSafe.configured && threatIntel.googleSafe.status === 'Clean') bonus += 5;
-    if (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged === 0) bonus += 5;
-
-    // 3. Compute Evidence-based Penalties
-    const totalPenalty = heuristics.penalty + threatIntel.penalty;
-    let score = Math.max(0, Math.min(100, Math.round(baseScore + bonus - totalPenalty)));
-
-    // 4. Combined Evidence Capping Rules:
-
-    // Rule A: Confirmed Malicious Threat (URLhaus listed, GSB match, VT >= 3 flags, SSRF alert, Typosquatting, Blacklist)
-    const isConfirmedMalicious = (
-      (threatIntel.urlHaus && threatIntel.urlHaus.found) ||
-      (threatIntel.googleSafe && threatIntel.googleSafe.status === 'THREAT MATCH') ||
-      (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged >= 3) ||
-      heuristics.checks.some(c => c.tag === 'BLOCKED / UNSAFE' || c.tag === 'SPOOFED' || c.tag === 'BLACKLISTED')
-    );
-
-    // Rule B: Strong Phishing Indicators (even if threat DBs return no match, CANNOT be 100/100 SAFE)
-    const hasStrongPhishingIndicators = (
-      heuristics.checks.some(c => c.tag === 'PHISHING' || c.tag === 'EXECUTABLE') ||
-      (threatIntel.phishTank && threatIntel.phishTank.status === 'Likely Phish')
-    );
-
-    // Rule C: Moderate Suspicious Signal (2 VT flags or 2+ failing structural checks)
-    const isSuspiciousThreat = (
-      (threatIntel.virusTotal && threatIntel.virusTotal.configured && threatIntel.virusTotal.flagged === 2) ||
-      heuristics.checks.filter(c => c.status === 'fail' && c.id !== 'ssl').length >= 2
-    );
-
-    if (isConfirmedMalicious) {
-      score = Math.min(score, 25); // Cap at <= 25 -> MALICIOUS
-    } else {
-      // Heuristic indicators alone without confirmed threat evidence CANNOT force MALICIOUS (<40)
-      if (hasStrongPhishingIndicators && !isTopTrusted) {
-        score = Math.min(score, 60); // Cap at <= 60 -> SUSPICIOUS (Never 100/100 SAFE)
-      } else if (isSuspiciousThreat) {
-        score = Math.min(score, 50); // Cap at <= 50 -> SUSPICIOUS
-      }
-      score = Math.max(40, score); // Non-malicious floor ensures heuristics alone do not trigger MALICIOUS
-    }
-
-    // 5. Risk Classification strictly aligned with score & combined evidence
-    let riskLevel, riskBadgeClass, riskBadgeIcon, summaryDesc;
-
-    if (score >= 85) {
-      riskLevel = 'SAFE';
-      riskBadgeClass = 'safe';
-      riskBadgeIcon = 'fa-shield-check';
-      summaryDesc = 'This website passed live DNS resolution, domain age verification, heuristic analysis, and security checks.';
-    } else if (score >= 65) {
-      riskLevel = 'LOW RISK';
-      riskBadgeClass = 'warning';
-      riskBadgeIcon = 'fa-circle-info';
-      summaryDesc = 'Domain has standard reputation with minor risk warnings — review detailed findings below.';
-    } else if (score >= 40) {
-      riskLevel = 'SUSPICIOUS';
-      riskBadgeClass = 'warning';
-      riskBadgeIcon = 'fa-triangle-exclamation';
-      summaryDesc = 'CAUTION: Multiple risk indicators or threat intelligence vendor flags detected — exercise caution.';
-    } else {
-      riskLevel = 'MALICIOUS';
-      riskBadgeClass = 'danger';
-      riskBadgeIcon = 'fa-triangle-exclamation';
-      summaryDesc = 'DANGER: Confirmed phishing, malware, or security threat detected. Do NOT enter credentials or interact with this URL.';
-    }
+    const engine = getScoringEngine();
+    const evaluated = engine.calculateSecurityScore(rawUrl, parsedUrl, heuristics, threatIntel);
 
     return {
       id: 'scan_' + Date.now(),
@@ -1322,10 +1083,13 @@ document.addEventListener('DOMContentLoaded', () => {
       tld: heuristics.tld,
       entropy: heuristics.entropy,
       rdap: rdap,
-      score: Math.round(score),
-      riskLevel, riskBadgeClass, riskBadgeIcon, summaryDesc,
+      score: evaluated.score,
+      riskLevel: evaluated.riskLevel,
+      riskBadgeClass: evaluated.riskBadgeClass,
+      riskBadgeIcon: evaluated.riskBadgeIcon,
+      summaryDesc: evaluated.summaryDesc,
       checks: heuristics.checks,
-      threatIntel,
+      threatIntel: threatIntel,
       timestamp: new Date().toLocaleString()
     };
   }
@@ -1345,20 +1109,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     animateGaugeScore(result.score, result.riskLevel);
 
-    checksList.innerHTML = result.checks.map(chk => `
-      <div class="check-item">
-        <div class="check-item-info">
-          <div class="check-icon-badge ${chk.status}">
-            <i class="fa-solid ${chk.status === 'pass' ? 'fa-check' : (chk.status === 'warning' ? 'fa-exclamation' : 'fa-xmark')}"></i>
+    checksList.innerHTML = result.checks.map(chk => {
+      const badgeStyle = chk.status === 'neutral' ? 'neutral' : chk.status;
+      const icon = chk.status === 'pass' ? 'fa-check' : (chk.status === 'warning' ? 'fa-exclamation' : (chk.status === 'neutral' ? 'fa-minus' : 'fa-xmark'));
+      return `
+        <div class="check-item">
+          <div class="check-item-info">
+            <div class="check-icon-badge ${badgeStyle}">
+              <i class="fa-solid ${icon}"></i>
+            </div>
+            <div>
+              <div class="check-text-title">${chk.title}</div>
+              <div class="check-text-desc">${chk.desc}</div>
+            </div>
           </div>
-          <div>
-            <div class="check-text-title">${chk.title}</div>
-            <div class="check-text-desc">${chk.desc}</div>
-          </div>
+          <span class="check-status-tag ${badgeStyle}">${chk.tag}</span>
         </div>
-        <span class="check-status-tag ${chk.status}">${chk.tag}</span>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     infoDomain.textContent = result.domain;
     infoProtocol.textContent = `${result.protocol} ${result.protocol === 'HTTPS' ? '🔒' : '⚠️'}`;
@@ -1395,13 +1163,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateThreatCard(prefix, data) {
     const s = document.getElementById(`${prefix}-status`);
     const d = document.getElementById(`${prefix}-desc`);
-    if (s && d) { s.textContent = data.status; s.className = `source-status ${data.badge}`; d.textContent = data.desc; }
+    if (s && d && data) {
+      s.textContent = data.status || 'Not Checked';
+      s.className = `source-status ${data.badge || 'badge-neutral'}`;
+      d.textContent = data.desc || 'Threat status not checked.';
+    }
   }
 
   function animateGaugeScore(targetScore, riskLevel) {
     const circumference = 502;
     const offset = circumference - (targetScore / 100) * circumference;
-    let strokeColor = targetScore < 40 ? '#EF4444' : targetScore < 75 ? '#F59E0B' : '#10B981';
+    let strokeColor = targetScore < 50 ? '#EF4444' : targetScore < 80 ? '#F59E0B' : '#10B981';
 
     scoreGaugeFill.style.stroke = strokeColor;
     scoreGaugeFill.style.strokeDashoffset = offset;
