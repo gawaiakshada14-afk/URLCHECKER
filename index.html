@@ -25,39 +25,23 @@
   <!-- Header / Navigation Bar -->
   <header class="navbar-header" id="navbar">
     <div class="container nav-container">
-      <a href="#home" class="brand-logo">
-        <div class="logo-icon-wrapper">
-          <i class="fa-solid fa-shield-halved"></i>
-        </div>
-        <span class="brand-name">Shield<span class="highlight">URL</span></span>
-        <span class="badge-pro">SaaS AI</span>
-      </a>
-
-      <nav class="nav-menu" id="nav-menu">
-        <a href="#home" class="nav-link active"><i class="fa-solid fa-house nav-icon"></i> Home</a>
-        <a href="#scanner" class="nav-link"><i class="fa-solid fa-radar nav-icon"></i> Scanner</a>
-        <a href="#dashboard" class="nav-link" id="nav-dashboard-link"><i class="fa-solid fa-chart-line nav-icon"></i> Dashboard</a>
-        <a href="#features" class="nav-link"><i class="fa-solid fa-cubes nav-icon"></i> Features</a>
-        <a href="#how-it-works" class="nav-link"><i class="fa-solid fa-diagram-project nav-icon"></i> Process</a>
-        <a href="#history" class="nav-link"><i class="fa-solid fa-clock-rotate-left nav-icon"></i> History</a>
-      </nav>
-
-      <div class="nav-actions">
-        <div id="db-status-badge" class="db-status-indicator" title="Connected to Supabase PostgreSQL Database" style="display: none;">
-          <i class="fa-solid fa-database"></i> <span id="db-status-text">Supabase DB</span>
-        </div>
-
-        <button id="btn-api-modal" class="btn-secondary btn-xs" title="Configure Threat API Keys" style="display: none;">
+      <div class="nav-actions-right">
+        <button type="button" class="top-action-btn" onclick="document.getElementById('btn-api-modal').click()" title="Configure Threat API Keys">
           <i class="fa-solid fa-key"></i> <span>API Keys</span>
         </button>
 
-        <button id="btn-admin-modal" class="btn-secondary btn-xs" title="Admin Operations & Settings" style="display: none;">
-          <i class="fa-solid fa-sliders"></i> <span>Admin</span>
+        <button type="button" class="top-action-btn" onclick="document.getElementById('btn-admin-modal').click()" title="Admin Operations & Settings">
+          <i class="fa-solid fa-crown"></i> <span>Admin</span>
         </button>
 
-        <button id="btn-open-ai-drawer" class="btn-primary btn-xs btn-ai-pulse" title="Ask AI Security Analyst Assistant" style="display: none;">
+        <button type="button" class="top-action-btn" onclick="document.getElementById('btn-open-ai-drawer').click()" title="Ask AI Security Analyst Assistant">
           <i class="fa-solid fa-robot"></i> <span>AI Analyst</span>
         </button>
+
+        <!-- Hidden Database Status Badge (Fully hidden from top UI per requirement) -->
+        <div id="db-status-badge" class="db-status-indicator" style="display: none !important;">
+          <i class="fa-solid fa-database"></i> <span id="db-status-text"></span>
+        </div>
 
         <!-- Dynamic Authentication & User Profile Component -->
         <div id="auth-nav-container">
@@ -67,7 +51,7 @@
           
           <div id="user-profile-menu" class="user-profile-dropdown" style="display: none;">
             <button id="btn-user-dropdown" class="user-profile-btn">
-              <div class="user-avatar" id="user-avatar-initials">AS</div>
+              <div class="user-avatar" id="user-avatar-initials">AG</div>
               <span class="user-display-name" id="user-display-name">Alex</span>
               <i class="fa-solid fa-chevron-down"></i>
             </button>
@@ -94,6 +78,40 @@
       </div>
     </div>
   </header>
+
+  <!-- Left-Side Vertical Navigation Sidebar -->
+  <aside class="sidebar-left" id="sidebar-left">
+    <div class="sidebar-brand">
+      <a href="#home" class="brand-logo">
+        <div class="logo-icon-wrapper">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <span class="brand-name">Shield<span class="highlight">URL</span></span>
+        <span class="badge-pro">SaaS AI</span>
+      </a>
+    </div>
+
+    <nav class="nav-menu" id="nav-menu">
+      <a href="#home" class="nav-link active"><i class="fa-solid fa-house nav-icon"></i> <span>Home</span></a>
+      <a href="#scanner" class="nav-link"><i class="fa-solid fa-magnifying-glass nav-icon"></i> <span>Scanner</span></a>
+      <a href="#dashboard" class="nav-link" id="nav-dashboard-link"><i class="fa-solid fa-chart-line nav-icon"></i> <span>Dashboard</span></a>
+      <a href="#features" class="nav-link"><i class="fa-solid fa-star nav-icon"></i> <span>Features</span></a>
+      <a href="#how-it-works" class="nav-link"><i class="fa-solid fa-diagram-project nav-icon"></i> <span>Process</span></a>
+      <a href="#history" class="nav-link"><i class="fa-solid fa-clock-rotate-left nav-icon"></i> <span>History</span></a>
+      
+      <button id="btn-api-modal" class="sidebar-btn nav-link" title="Configure Threat API Keys" style="display: none;">
+        <i class="fa-solid fa-key nav-icon"></i> <span>API Keys</span>
+      </button>
+
+      <button id="btn-admin-modal" class="sidebar-btn nav-link" title="Admin Operations & Settings" style="display: none;">
+        <i class="fa-solid fa-shield-halved nav-icon"></i> <span>Admin</span>
+      </button>
+
+      <button id="btn-open-ai-drawer" class="sidebar-btn nav-link" title="Ask AI Security Analyst Assistant" style="display: none;">
+        <i class="fa-solid fa-brain nav-icon"></i> <span>AI Analyst</span>
+      </button>
+    </nav>
+  </aside>
 
   <!-- Main Content Wrapper -->
   <main>
@@ -914,7 +932,7 @@
             </div>
             <div class="health-card">
               <span class="health-label">Database Provider</span>
-              <span class="health-value">Supabase PostgreSQL</span>
+              <span class="health-value">PostgreSQL</span>
             </div>
             <div class="health-card">
               <span class="health-label">Rate Limiter</span>
@@ -925,7 +943,7 @@
               <span class="health-value">Express.js (Port 3000)</span>
             </div>
           </div>
-          <button id="btn-reinit-db" class="btn-secondary btn-sm margin-top-md"><i class="fa-solid fa-rotate"></i> Re-initialize Supabase Schema & Seed</button>
+          <button id="btn-reinit-db" class="btn-secondary btn-sm margin-top-md"><i class="fa-solid fa-rotate"></i> Re-initialize Database Schema & Seed</button>
         </div>
 
       </div>

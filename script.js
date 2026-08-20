@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (data.connected) {
           if (badge) badge.className = 'db-status-indicator';
-          if (text) text.innerHTML = '<i class="fa-solid fa-database" style="color:#10B981"></i> Supabase DB';
+          if (text) text.innerHTML = '<i class="fa-solid fa-database" style="color:#10B981"></i> Database';
           fetchRulesFromApi();
           fetchScansFromApi();
           fetchKpisFromApi();
@@ -1646,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchAdminUsers() {
     const tbody = document.getElementById('admin-users-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Loading users from Supabase...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Loading users from database...</td></tr>';
 
     try {
       const res = await fetch('/api/admin/users');
@@ -1672,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnReinitDb = document.getElementById('btn-reinit-db');
   if (btnReinitDb) {
     btnReinitDb.addEventListener('click', async () => {
-      if (!confirm('Re-initialize Supabase database schema and reset seed data?')) return;
+      if (!confirm('Re-initialize database schema and reset seed data?')) return;
       try {
         const res = await fetch('/api/init-db', { method: 'POST' });
         const data = await res.json();
