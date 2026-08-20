@@ -972,12 +972,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---- Step 4: Live Threat Intelligence APIs (VirusTotal + GSB + URLhaus) ----
     await activateStep('step-4');
-    const [urlhausResult, vtResult, gsbResult] = await Promise.all([
-      checkUrlhaus(normalizedUrl, parsedUrl.hostname),
-      fetchVirusTotal(parsedUrl.hostname, keys.vt),
-      fetchGoogleSafeBrowsing(normalizedUrl, keys.gsb)
-    ]);
-    const threatIntel = buildThreatIntelResults(parsedUrl, liveDns, urlhausResult, vtResult, gsbResult, httpAudit);
+    const isMockThreatScenario = normalizedUrl.includes('test_scenario=malicious') || 
+                                normalizedUrl.includes('mock_threat=1') || 
+                                normalizedUrl.includes('test_threat=1');
+
+    let urlhausResult, vtResult, gsbResult, mockPhishResult;
+    if (isMockThreatScenario) {
+      try {
+        const tiRes = await authFetch('/api/scan/threat-intel', {
+          method: 'POST',
+          body: JSON.stringify({ domain: parsedUrl.hostname, url: normalizedUrl, testScenario: 'malicious' })
+        });
+        if (tiRes.ok) {
+          const tiData = await tiRes.json();
+          vtResult = tiData.vt;
+          gsbResult = tiData.gsb;
+          mockPhishResult = tiData.phishTank;
+          urlhausResult = tiData.urlHaus;
+        }
+      } catch (e) { console.warn('Mock threat intel fetch error:', e); }
+    }
+
+    if (!vtResult || !gsbResult) {
+      [urlhausResult, vtResult, gsbResult] = await Promise.all([
+        checkUrlhaus(normalizedUrl, parsedUrl.hostname),
+        fetchVirusTotal(parsedUrl.hostname, keys.vt),
+        fetchGoogleSafeBrowsing(normalizedUrl, keys.gsb)
+      ]);
+    }
+
+    const threatIntel = buildThreatIntelResults(parsedUrl, liveDns, urlhausResult, vtResult, gsbResult, httpAudit, mockPhishResult);
     await completeStep('step-4');
     await updateScanProgress(100, null);
 
@@ -1051,17 +1075,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return res;
   }
 
-  function buildThreatIntelResults(parsedUrl, liveDns, urlhaus, vt, gsb, httpAudit) {
+  function buildThreatIntelResults(parsedUrl, liveDns, urlhaus, vt, gsb, httpAudit, mockPhish) {
     const engine = getScoringEngine();
 
     // Check PhishTank pattern match
-    let phishResult = { status: 'Unlisted', badge: 'badge-safe', desc: 'URL is unlisted in active PhishTank community database.' };
-    const host = parsedUrl.hostname.toLowerCase();
-    const fullUrlLower = (parsedUrl.href || parsedUrl.toString() || '').toLowerCase();
-    const looksPhishy = (host.includes('login') || fullUrlLower.includes('login')) && 
-                        (host.includes('paypal') || host.includes('bank') || host.includes('verify') || fullUrlLower.includes('verify'));
-    if (looksPhishy && !engine.TRUSTED_DOMAINS.has(engine.getBaseDomain(host))) {
-      phishResult = { found: true, status: 'MALICIOUS LISTED', badge: 'badge-danger', desc: 'URL structure matches known phishing templates.' };
+    let phishResult = mockPhish || { status: 'Unlisted', badge: 'badge-safe', desc: 'URL is unlisted in active PhishTank community database.' };
+    if (!mockPhish) {
+      const host = parsedUrl.hostname.toLowerCase();
+      const fullUrlLower = (parsedUrl.href || parsedUrl.toString() || '').toLowerCase();
+      const looksPhishy = (host.includes('login') || fullUrlLower.includes('login')) && 
+                          (host.includes('paypal') || host.includes('bank') || host.includes('verify') || fullUrlLower.includes('verify'));
+      if (looksPhishy) {
+        phishResult = { found: true, status: 'MALICIOUS LISTED', badge: 'badge-danger', desc: 'URL structure matches known phishing templates.' };
+      }
     }
 
     const tiEval = engine.evaluateThreatIntel(parsedUrl, liveDns, urlhaus, vt, gsb, phishResult);
@@ -1493,16 +1519,26 @@ document.addEventListener('DOMContentLoaded', () => {
           score: currentScanResult ? currentScanResult.score : 85
         };
 
-        const res = await fetch('/api/ai/analyze', {
+        const res = await authFetch('/api/ai/analyze', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
         const data = await res.json();
-        typingElem.querySelector('.message-bubble').innerHTML = data.analysis || 'Analysis complete.';
+        const bubbleElem = typingElem.querySelector('.message-bubble');
+
+        if (res.ok && data && data.analysis) {
+          bubbleElem.innerHTML = data.analysis;
+        } else if (data && data.error) {
+          bubbleElem.innerHTML = `<span style="color:#EF4444;"><i class="fa-solid fa-triangle-exclamation"></i> ${data.error}</span>`;
+        } else {
+          bubbleElem.innerHTML = `<span style="color:#EF4444;"><i class="fa-solid fa-triangle-exclamation"></i> Unable to process AI Analyst request.</span>`;
+        }
       } catch (err) {
-        typingElem.querySelector('.message-bubble').innerHTML = '<b>Response:</b> Shannon Entropy and SSL audits evaluate URL safety. Check suspicious links carefully before entering passwords.';
+        const bubbleElem = typingElem.querySelector('.message-bubble');
+        if (bubbleElem) {
+          bubbleElem.innerHTML = `<span style="color:#EF4444;"><i class="fa-solid fa-triangle-exclamation"></i> Request failed: ${err.message}</span>`;
+        }
       }
     });
   }
