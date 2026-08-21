@@ -277,13 +277,24 @@ ul {
   left: 0;
   bottom: 0;
   width: 240px;
-  background: #0B0F19;
-  border-right: 1px solid #1E293B;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
   padding: 1.25rem 1rem;
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-left.sidebar-visible {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
 }
 
 .sidebar-brand {
@@ -298,22 +309,22 @@ ul {
   font-family: 'Poppins', sans-serif;
   font-weight: 800;
   font-size: 1.35rem;
-  color: #FFFFFF;
+  color: #0F172A;
 }
 
 .sidebar-brand .brand-name .highlight {
-  color: #3B82F6;
+  color: #2563EB;
 }
 
 .sidebar-brand .badge-pro {
   font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
-  background: rgba(37, 99, 235, 0.25);
-  color: #60A5FA;
+  background: #EFF6FF;
+  color: #2563EB;
   padding: 0.15rem 0.45rem;
   border-radius: 9999px;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  border: 1px solid #BFDBFE;
   margin-left: 0.25rem;
 }
 
@@ -325,7 +336,7 @@ ul {
 }
 
 .sidebar-left .nav-link {
-  color: #94A3B8;
+  color: #475569;
   font-weight: 500;
   font-size: 0.92rem;
   display: flex;
@@ -344,15 +355,15 @@ ul {
 }
 
 .sidebar-left .nav-link:hover {
-  color: #F8FAFC;
-  background: rgba(255, 255, 255, 0.06);
+  color: #0F172A;
+  background: #F1F5F9;
 }
 
 .sidebar-left .nav-link.active {
-  background: #2563EB;
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   color: #FFFFFF;
   font-weight: 600;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
 .nav-icon {
@@ -366,7 +377,6 @@ ul {
   align-items: center;
   justify-content: flex-end;
   gap: 1.5rem;
-  width: 100%;
 }
 
 .top-action-btn {
@@ -386,11 +396,25 @@ ul {
   color: #2563EB;
 }
 
+.navbar-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.85rem 0;
+  transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+main, footer {
+  transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (min-width: 992px) {
-  .navbar-header {
-    margin-left: 240px;
-  }
-  main, footer {
+  body.has-sidebar-open .navbar-header,
+  body.has-sidebar-open main,
+  body.has-sidebar-open footer {
     margin-left: 240px;
   }
 }
@@ -1679,15 +1703,50 @@ ul {
 }
 
 /* --------------------------------------------------------------------------
-   13. User Authentication Modal Styling
+   13. User Authentication Modal Styling (Clean Light Professional Design)
    -------------------------------------------------------------------------- */
 .auth-modal-card {
-  max-width: 440px;
+  max-width: 440px !important;
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.18) !important;
+  padding: 2rem !important;
+}
+
+.auth-modal-card .modal-header {
+  border-bottom: none !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.auth-modal-card .modal-header h3 {
+  color: #0F172A !important;
+  font-weight: 700 !important;
+  font-size: 1.25rem !important;
+}
+
+.auth-modal-card .btn-close {
+  color: #64748B !important;
+  background: #F1F5F9 !important;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+}
+
+.auth-modal-card .btn-close:hover {
+  color: #0F172A !important;
+  background: #E2E8F0 !important;
 }
 
 .auth-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #E2E8F0;
   margin-bottom: 1.25rem;
 }
 
@@ -1700,61 +1759,133 @@ ul {
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #64748B !important;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
 }
 
 .auth-tab-btn.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+  color: #2563EB !important;
+  border-bottom-color: #2563EB !important;
 }
 
 .demo-auth-banner {
-  background: var(--primary-light);
-  border: 1px solid var(--primary-border);
-  padding: 0.85rem;
-  border-radius: var(--border-radius-md);
-  margin-bottom: 1rem;
+  background: #EFF6FF !important;
+  border: 1px solid #BFDBFE !important;
+  padding: 1rem !important;
+  border-radius: 12px !important;
+  margin-bottom: 1.25rem !important;
   text-align: center;
 }
 
 .demo-auth-banner p {
-  font-size: 0.8rem;
-  color: var(--primary);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-size: 0.825rem !important;
+  color: #1D4ED8 !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.65rem !important;
+}
+
+.demo-auth-banner #btn-demo-login {
+  background: #FFFFFF !important;
+  color: #2563EB !important;
+  border: 1px solid #93C5FD !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1) !important;
+  transition: all 0.2s ease !important;
+}
+
+.demo-auth-banner #btn-demo-login:hover {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border-color: #2563EB !important;
+  transform: translateY(-1px);
 }
 
 .auth-divider {
   display: flex;
   align-items: center;
   text-align: center;
-  margin: 1rem 0;
-  color: var(--text-subtle);
-  font-size: 0.75rem;
+  margin: 1.25rem 0;
+  color: #94A3B8 !important;
+  font-size: 0.75rem !important;
+  font-weight: 600;
 }
 
 .auth-divider::before, .auth-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #E2E8F0 !important;
 }
 
 .auth-divider span {
-  padding: 0 0.5rem;
+  padding: 0 0.75rem;
 }
 
-.auth-form .form-group {
-  margin-bottom: 1rem;
+.auth-form label {
+  color: #334155 !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  margin-bottom: 0.4rem !important;
+  display: block;
+}
+
+.auth-form .modal-input {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 8px !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.9rem !important;
+  width: 100% !important;
+  transition: all 0.2s ease !important;
+}
+
+.auth-form .modal-input:focus {
+  background: #FFFFFF !important;
+  border-color: #2563EB !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
 
 .form-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
-  margin-bottom: 1rem;
+  font-size: 0.825rem !important;
+  color: #475569 !important;
+  margin-bottom: 1.25rem !important;
+}
+
+.form-options label {
+  color: #475569 !important;
+  font-weight: 500 !important;
+  margin-bottom: 0 !important;
+  cursor: pointer;
+}
+
+.form-options a {
+  color: #2563EB !important;
+  font-weight: 600 !important;
+  text-decoration: none;
+}
+
+.form-options a:hover {
+  text-decoration: underline;
+}
+
+.auth-form .btn-primary {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding: 0.8rem 1.5rem !important;
+  font-size: 0.95rem !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+}
+
+.auth-form .btn-primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35) !important;
 }
 
 /* --------------------------------------------------------------------------

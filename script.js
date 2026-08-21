@@ -621,6 +621,30 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStatusBadge('gsb-status-hint', gsbKey ? 'Key Saved' : 'Not Configured', gsbKey ? 'badge-safe' : 'badge-neutral');
   }
 
+  const topBrandLogo = document.getElementById('top-brand-logo');
+  const sidebarBrandLogo = document.getElementById('sidebar-brand-logo');
+  const sidebarLeft = document.getElementById('sidebar-left');
+
+  function toggleSidebarNavigation() {
+    if (sidebarLeft) {
+      sidebarLeft.classList.toggle('sidebar-visible');
+      document.body.classList.toggle('has-sidebar-open');
+    }
+  }
+
+  if (topBrandLogo) {
+    topBrandLogo.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleSidebarNavigation();
+    });
+  }
+  if (sidebarBrandLogo) {
+    sidebarBrandLogo.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleSidebarNavigation();
+    });
+  }
+
   mobileToggle.addEventListener('click', () => navMenu.classList.toggle('mobile-open'));
   document.querySelectorAll('.nav-link').forEach(link => { link.addEventListener('click', () => navMenu.classList.remove('mobile-open')); });
 
