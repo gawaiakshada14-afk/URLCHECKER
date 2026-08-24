@@ -647,8 +647,16 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
   const targetUrl = url || `https://${targetDomain}`;
 
   try {
-    const vt_key = process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY || process.env.API_KEY || req.body.vtKey || keysRes.rows[0]?.vt_key || '';
-    const gsb_key = process.env.GOOGLE_SAFE_BROWSING_KEY || process.env.GSB_API_KEY || process.env.GOOGLE_BROWSING_KEY || req.body.gsbKey || keysRes.rows[0]?.gsb_key || '';
+    let dbKeys = {};
+    try {
+      const keysRes = await query('SELECT vt_key, gsb_key FROM api_keys ORDER BY id DESC LIMIT 1;');
+      if (keysRes.rows && keysRes.rows.length > 0) {
+        dbKeys = keysRes.rows[0];
+      }
+    } catch (dbErr) {}
+
+    const vt_key = process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY || process.env.API_KEY || req.body.vtKey || dbKeys.vt_key || '';
+    const gsb_key = process.env.GOOGLE_SAFE_BROWSING_KEY || process.env.GSB_API_KEY || process.env.GOOGLE_BROWSING_KEY || req.body.gsbKey || dbKeys.gsb_key || '';
 
     let vtResult = { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'VirusTotal API unconfigured. Threat status not checked.' };
     let gsbResult = { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
@@ -679,12 +687,19 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
                 ? `WARNING: ${flagged} out of ${total} security vendors flagged this domain on VirusTotal.`
                 : `Verified clean across ${total} threat intelligence vendors on VirusTotal.`
             };
+          } else {
+            vtResult = { configured: true, found: false, status: 'Clean / Unlisted', badge: 'badge-safe', desc: 'Domain has no malicious reports on VirusTotal.' };
           }
+        } else if (vtRes.status === 401 || vtRes.status === 403) {
+          vtResult = { configured: false, status: 'Invalid API Key', badge: 'badge-danger', desc: `VirusTotal API key rejected (HTTP ${vtRes.status}).` };
+        } else if (vtRes.status === 429) {
+          vtResult = { configured: true, status: 'Rate Limited', badge: 'badge-warning', desc: 'VirusTotal API request rate limit exceeded (HTTP 429).' };
         } else {
-          vtResult = { configured: true, found: false, status: 'Inconclusive / No Record', badge: 'badge-neutral', desc: 'No threat intelligence record found or response inconclusive.' };
+          vtResult = { configured: true, found: false, status: `HTTP ${vtRes.status}`, badge: 'badge-neutral', desc: `VirusTotal returned status HTTP ${vtRes.status}.` };
         }
       } catch (e) {
-        vtResult = { configured: true, found: false, status: 'Provider Inconclusive', badge: 'badge-neutral', desc: 'Could not contact VirusTotal threat intelligence endpoint.' };
+        console.error('[VirusTotal API Error]:', e.message);
+        vtResult = { configured: true, found: false, status: 'Provider Inconclusive', badge: 'badge-neutral', desc: `Could not contact VirusTotal endpoint: ${e.message}` };
       }
     }
 
@@ -712,16 +727,20 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
           } else {
             gsbResult = { configured: true, found: true, status: 'Clean', badge: 'badge-safe', desc: 'Google Safe Browsing verified no threat matches for this URL.' };
           }
+        } else if (gsbRes.status === 400 || gsbRes.status === 403) {
+          gsbResult = { configured: false, status: 'Invalid API Key', badge: 'badge-danger', desc: `Google Safe Browsing API key rejected (HTTP ${gsbRes.status}).` };
         } else {
-          gsbResult = { configured: true, found: false, status: 'Inconclusive / No Record', badge: 'badge-neutral', desc: 'No Google Safe Browsing match found or response inconclusive.' };
+          gsbResult = { configured: true, found: false, status: `HTTP ${gsbRes.status}`, badge: 'badge-neutral', desc: `Google Safe Browsing returned status HTTP ${gsbRes.status}.` };
         }
       } catch (e) {
-        gsbResult = { configured: true, found: false, status: 'Provider Inconclusive', badge: 'badge-neutral', desc: 'Could not contact Google Safe Browsing endpoint.' };
+        console.error('[Google Safe Browsing API Error]:', e.message);
+        gsbResult = { configured: true, found: false, status: 'Provider Inconclusive', badge: 'badge-neutral', desc: `Could not contact Google Safe Browsing endpoint: ${e.message}` };
       }
     }
 
     res.json({ vt: vtResult, gsb: gsbResult });
   } catch (err) {
+    console.error('[Threat Intel Endpoint Error]:', err.message);
     res.status(500).json({ error: 'Failed to execute threat intelligence checks.' });
   }
 });

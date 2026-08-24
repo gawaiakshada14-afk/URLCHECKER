@@ -843,52 +843,65 @@ document.addEventListener('DOMContentLoaded', () => {
    * Queries REAL Google Safe Browsing API v4 when key is provided
    */
   async function fetchGoogleSafeBrowsing(url, apiKey) {
-    if (!apiKey) {
-      return { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
+    if (apiKey) {
+      try {
+        const res = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(apiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client: { clientId: "shieldurl", clientVersion: "2.0" },
+            threatInfo: {
+              threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
+              platformTypes: ["ANY_PLATFORM"],
+              threatEntryTypes: ["URL"],
+              threatEntries: [{ url: url }]
+            }
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.matches && data.matches.length > 0) {
+            const types = data.matches.map(m => m.threatType).join(', ');
+            return {
+              configured: true,
+              found: true,
+              status: 'THREAT MATCH',
+              badge: 'badge-danger',
+              desc: `Google Safe Browsing flagged this URL: [${types}].`
+            };
+          } else {
+            return {
+              configured: true,
+              found: true,
+              status: 'Clean',
+              badge: 'badge-safe',
+              desc: 'No social engineering, phishing, or malware threats detected by Google Safe Browsing.'
+            };
+          }
+        } else if (res.status === 400 || res.status === 403) {
+          return { configured: true, found: false, status: 'Invalid Key', badge: 'badge-danger', desc: 'Google Safe Browsing key rejected or API disabled in Google Cloud Console.' };
+        }
+      } catch (e) { console.warn('Direct Google Safe Browsing fetch failed:', e); }
     }
 
     try {
-      const res = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(apiKey)}`, {
+      const res = await authFetch('/api/scan/threat-intel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client: { clientId: "shieldurl", clientVersion: "2.0" },
-          threatInfo: {
-            threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
-            platformTypes: ["ANY_PLATFORM"],
-            threatEntryTypes: ["URL"],
-            threatEntries: [{ url: url }]
-          }
-        })
+        body: JSON.stringify({ url, gsbKey: apiKey })
       });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.matches && data.matches.length > 0) {
-        const types = data.matches.map(m => m.threatType).join(', ');
-        return {
-          configured: true,
-          found: true,
-          status: 'THREAT MATCH',
-          badge: 'badge-danger',
-          desc: `Google Safe Browsing flagged this URL: [${types}].`
-        };
-      } else {
-        return {
-          configured: true,
-          found: true,
-          status: 'Clean',
-          badge: 'badge-safe',
-          desc: 'No social engineering, phishing, or malware threats detected by Google Safe Browsing.'
-        };
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.gsb) {
+          return data.gsb;
+        }
       }
-    } else if (res.status === 400 || res.status === 403) {
-      return { configured: true, found: false, status: 'Invalid Key', badge: 'badge-danger', desc: 'Google Safe Browsing key rejected or API disabled in Google Cloud Console.' };
+    } catch (e) {
+      console.warn('Backend Google Safe Browsing proxy fetch failed:', e);
     }
-  } catch (e) { console.warn('Google Safe Browsing fetch failed:', e); }
 
-  return { configured: true, found: false, status: 'Query Error', badge: 'badge-warning', desc: 'Google Safe Browsing API call failed.' };
-}
+    return { configured: false, status: 'NOT CHECKED', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
+  }
 
   /**
    * Checks domain against REAL URLhaus (abuse.ch) malware host feed via proxy
