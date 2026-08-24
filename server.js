@@ -725,7 +725,7 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
             const types = data.matches.map(m => m.threatType).join(', ');
             gsbResult = { configured: true, found: true, status: 'THREAT MATCH', badge: 'badge-danger', desc: `Google Safe Browsing flagged this URL: [${types}].` };
           } else {
-            gsbResult = { configured: true, found: true, status: 'Clean', badge: 'badge-safe', desc: 'Google Safe Browsing verified no threat matches for this URL.' };
+            gsbResult = { configured: true, found: false, status: 'Clean', badge: 'badge-safe', desc: 'Google Safe Browsing verified no threat matches for this URL.' };
           }
         } else if (gsbRes.status === 400 || gsbRes.status === 403) {
           gsbResult = { configured: false, status: 'Invalid API Key', badge: 'badge-danger', desc: `Google Safe Browsing API key rejected (HTTP ${gsbRes.status}).` };

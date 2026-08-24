@@ -873,10 +873,10 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             return {
               configured: true,
-              found: true,
+              found: false,
               status: 'Clean',
               badge: 'badge-safe',
-              desc: 'No social engineering, phishing, or malware threats detected by Google Safe Browsing.'
+              desc: 'Google Safe Browsing verified no threat matches for this URL.'
             };
           }
         } else if (res.status === 400 || res.status === 403) {

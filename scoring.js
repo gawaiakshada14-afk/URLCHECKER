@@ -462,14 +462,15 @@
     // Google Safe Browsing
     let gsbResult = gsb || { configured: false, status: 'Not Checked', badge: 'badge-neutral', desc: 'Google Safe Browsing API unconfigured. Threat status not checked.' };
     if (gsbResult.configured) {
-      if (gsbResult.status === 'THREAT MATCH' || gsbResult.found === true) {
+      if (gsbResult.status === 'THREAT MATCH' || (gsbResult.found === true && gsbResult.status !== 'Clean')) {
         isConfirmedThreat = true;
         gsbResult.status = 'THREAT MATCH';
         gsbResult.badge = 'badge-danger';
         gsbResult.desc = gsbResult.desc || 'Google Safe Browsing flagged this URL as malicious.';
-      } else if (gsbResult.status === 'Clean') {
+      } else if (gsbResult.status === 'Clean' || gsbResult.found === false) {
+        gsbResult.status = 'Clean';
         gsbResult.badge = 'badge-safe';
-        gsbResult.desc = 'Google Safe Browsing verified no threat matches.';
+        gsbResult.desc = gsbResult.desc || 'Google Safe Browsing verified no threat matches for this URL.';
       }
     } else {
       gsbResult.status = 'Not Checked';
