@@ -344,13 +344,13 @@
             <p>Enter any domain name or complete URL (HTTP/HTTPS) to launch immediate heuristic scan.</p>
           </div>
 
-          <form id="url-scan-form" class="url-input-form" onsubmit="return false;">
+          <form id="url-scan-form" class="url-input-form" onsubmit="return false;" novalidate>
             <div class="input-group">
               <div class="input-prefix">
                 <i class="fa-solid fa-globe"></i>
               </div>
               <input 
-                type="url" 
+                type="text" 
                 id="url-input" 
                 class="url-input" 
                 placeholder="e.g. https://paypal.verification-portal-security.xyz/login" 

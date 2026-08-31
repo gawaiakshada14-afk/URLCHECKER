@@ -45,8 +45,10 @@
 
   function getBaseDomain(hostname) {
     if (!hostname) return '';
-    const parts = hostname.toLowerCase().split('.');
-    if (parts.length <= 2) return hostname.toLowerCase();
+    const cleanHost = hostname.toLowerCase().split(':')[0];
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(cleanHost)) return cleanHost;
+    const parts = cleanHost.split('.');
+    if (parts.length <= 2) return cleanHost;
     return parts.slice(-2).join('.');
   }
 
@@ -323,8 +325,8 @@
       });
     }
 
-    const subdomainDepth = hostname.split('.').length - 2;
-    if (subdomainDepth >= 3) {
+    const subdomainDepth = isIpHost ? 0 : (hostname.split('.').length - 2);
+    if (!isIpHost && subdomainDepth >= 3) {
       totalDeduction += 8;
       checks.push({
         id: 'subdomains',
@@ -376,8 +378,8 @@
     }
 
     // 7. TLD Assessment
-    const tld = hostname.split('.').pop();
-    if (tld && HIGH_RISK_TLDS.has(tld.toLowerCase())) {
+    const tld = isIpHost ? 'IPv4' : hostname.split('.').pop();
+    if (!isIpHost && tld && HIGH_RISK_TLDS.has(tld.toLowerCase())) {
       totalDeduction += 5;
       checks.push({
         id: 'tld',
@@ -392,7 +394,7 @@
       checks,
       totalDeduction,
       entropy: entropy.toFixed(2),
-      tld: '.' + tld,
+      tld: isIpHost ? 'IPv4' : '.' + tld,
       isIpHost
     };
   }

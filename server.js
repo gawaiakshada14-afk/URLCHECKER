@@ -643,7 +643,7 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
     });
   }
 
-  const targetDomain = domain || (url ? url.replace(/^https?:\/\//i, '').split('/')[0] : 'unknown');
+  const targetDomain = (domain || (url ? url.replace(/^https?:\/\//i, '').split('/')[0] : 'unknown')).split(':')[0];
   const targetUrl = url || `https://${targetDomain}`;
 
   try {
@@ -663,7 +663,9 @@ app.post('/api/scan/threat-intel', authMiddleware, async (req, res) => {
 
     if (vt_key) {
       try {
-        const vtRes = await fetch(`https://www.virustotal.com/api/v3/domains/${encodeURIComponent(targetDomain)}`, {
+        const isIpTarget = /^(\d{1,3}\.){3}\d{1,3}$/.test(targetDomain);
+        const vtEndpoint = isIpTarget ? 'ip_addresses' : 'domains';
+        const vtRes = await fetch(`https://www.virustotal.com/api/v3/${vtEndpoint}/${encodeURIComponent(targetDomain)}`, {
           headers: { 'x-apikey': vt_key },
           signal: AbortSignal.timeout(5000)
         });
